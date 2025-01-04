@@ -1,12 +1,17 @@
 name: Tests
 
-on: [push]
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
 
 jobs:
   test:
+    # Skip push events on PR branches
+    if: github.event_name != 'push' || github.event.pull_request == null
     name: Test on node ${{ matrix.node-version }} and ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -29,6 +34,7 @@ jobs:
       run: npm test
 
     - name: Upload coverage to Coveralls
+      if: github.event_name == 'pull_request' && matrix.node-version == '22.x' && matrix.os == 'ubuntu-latest'
       uses: coverallsapp/github-action@v2
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
