@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const ignore = require('ignore');
 
 /**
  * Configuration options for repository serialization
@@ -17,9 +18,7 @@ const path = require('path');
 const DEFAULT_IGNORE_PATTERNS = [
     '.git/',
     'package-lock.json',
-    'node_modules/',
 ];
-
 
 /**
  * Checks if a file is a text file based on its content.
@@ -56,105 +55,76 @@ function isTextFile(filePath) {
 }
 
 /**
- * Checks if a file or directory should be ignored based on .gitignore rules.
+ * Reads gitignore patterns from a directory
  *
- * @param {string} filePath - The path to the file or directory.
- * @param {string[]} gitignorePatterns - The patterns from .gitignore files.
- * @param {string} repoRoot - The root directory of the repository.
- * @returns {boolean} - True if the file or directory should be ignored, false otherwise.
+ * @param {string} dir - Directory to read patterns from
+ * @returns {string[]} - Array of patterns from the gitignore file
  */
-function shouldIgnore(filePath, gitignorePatterns, repoRoot) {
-    const normalizedPath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
-
-    for (const pattern of gitignorePatterns) {
-        // Handle directory-specific patterns
-        const patternRegex = pattern
-            .replace(/\./g, '\\.') // Escape dots
-            .replace(/\*/g, '.*') // Convert globs to regex
-            .replace(/\?/g, '.') // Convert ? to single character match
-            .replace(/\[!\]/g, '[^]') // Convert negated character classes
-            // Handle directory-only patterns (ending with /)
-            .replace(/\/$/g, '(?:/.*)?$');
-
-        const regex = new RegExp(`^${patternRegex}$`);
-        if (regex.test(normalizedPath)) {
-            return true;
-        }
-
-        // Check if any parent directory matches directory-only patterns
-        const dirPattern = pattern.endsWith('/') ? pattern : pattern + '/';
-        const dirRegex = new RegExp(`^${dirPattern.replace(/\./g, '\\.').replace(/\*/g, '.*')}.*$`);
-        if (dirRegex.test(normalizedPath + '/')) {
-            return true;
-        }
+function readGitignorePatterns(dir) {
+    const gitignorePath = path.join(dir, '.gitignore');
+    if (fs.existsSync(gitignorePath)) {
+        const content = fs.readFileSync(gitignorePath, 'utf-8');
+        return content.split('\n')
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#'));
     }
-
-    return false;
+    return [];
 }
 
 /**
- * Reads and parses .gitignore files to get ignore patterns.
- * Checks all directories from the given path up to the repo root.
+ * Creates initial ignore instance with default patterns
  *
- * @param {string} startPath - The path to start looking for .gitignore files from.
- * @param {string} repoRoot - The root directory of the repository.
- * @returns {string[]} - An array of ignore patterns.
+ * @param {string[]} additionalPatterns - Additional patterns to add
+ * @returns {Object} - Ignore instance with default patterns
  */
-function getGitignorePatterns(startPath, repoRoot) {
-    let patterns = [];
-    let currentPath = startPath;
-
-    while (currentPath.length >= repoRoot.length) {
-        const gitignorePath = path.join(currentPath, '.gitignore');
-
-        if (fs.existsSync(gitignorePath)) {
-            const content = fs.readFileSync(gitignorePath, 'utf-8');
-            const localPatterns = content.split('\n')
-                .map(line => line.trim())
-                .filter(line => line && !line.startsWith('#'))
-                .map(pattern => {
-                    // Make the pattern relative to the .gitignore file's location
-                    const relativePath = path.relative(repoRoot, currentPath);
-                    return relativePath ? path.join(relativePath, pattern).replace(/\\/g, '/') : pattern;
-                });
-            patterns.push(...localPatterns);
-        }
-
-        // Move up one directory
-        const parentPath = path.dirname(currentPath);
-        if (parentPath === currentPath) break; // Stop if we can't go up anymore
-        currentPath = parentPath;
+function createInitialIgnore(additionalPatterns) {
+    const ig = ignore();
+    ig.add(DEFAULT_IGNORE_PATTERNS);
+    if (additionalPatterns.length > 0) {
+        ig.add(additionalPatterns);
     }
-
-    return patterns;
+    return ig;
 }
 
 /**
  * Generates the file and folder structure of the repository.
  *
  * @param {string} dir - The directory to traverse.
- * @param {string[]} parentGitignorePatterns - The patterns from parent .gitignore files.
+ * @param {Object} parentIg - The parent ignore instance
  * @param {string} repoRoot - The root directory of the repository.
  * @param {string} prefix - The prefix for indentation.
+ * @param {string[]} additionalPatterns - Additional patterns to ignore.
  * @returns {string} - The file and folder structure.
  */
-function generateStructure(dir, parentGitignorePatterns, repoRoot, prefix = '') {
+function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns) {
     let structure = '';
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-    // Add root folder name if this is the root level (empty prefix)
+    // Create new ignore instance for this directory
+    const ig = ignore().add(parentIg);
+
+    // Add patterns from this directory's .gitignore if it exists
+    const dirPatterns = readGitignorePatterns(dir);
+    if (dirPatterns.length > 0) {
+        ig.add(dirPatterns);
+    }
+
+    // Add root folder name if this is the root level
     if (prefix === '') {
         structure += `${path.basename(dir)}/\n`;
     }
 
-    // Get gitignore patterns for this directory
-    const gitignorePatterns = [...parentGitignorePatterns, ...getGitignorePatterns(dir, repoRoot)];
-
     // Filter and sort entries
     const validEntries = entries
-        .filter(entry => !shouldIgnore(path.join(dir, entry.name), gitignorePatterns, repoRoot))
+        .filter(entry => {
+            const fullPath = path.join(dir, entry.name);
+            let relativePath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
+            if (entry.isDirectory()) {
+                relativePath += '/';
+            }
+            return !ig.ignores(relativePath);
+        })
         .sort((a, b) => {
-            // Directories come first, then sort alphabetically
             if (a.isDirectory() && !b.isDirectory()) return -1;
             if (!a.isDirectory() && b.isDirectory()) return 1;
             return a.name.localeCompare(b.name);
@@ -169,7 +139,7 @@ function generateStructure(dir, parentGitignorePatterns, repoRoot, prefix = '') 
         structure += `${prefix}${connector}${entry.name}${entry.isDirectory() ? '/' : ''}\n`;
 
         if (entry.isDirectory()) {
-            structure += generateStructure(fullPath, gitignorePatterns, repoRoot, childPrefix);
+            structure += generateStructure(fullPath, ig, repoRoot, childPrefix, additionalPatterns);
         }
     });
 
@@ -180,30 +150,40 @@ function generateStructure(dir, parentGitignorePatterns, repoRoot, prefix = '') 
  * Generates a file containing the contents of all text files in the repository.
  *
  * @param {string} dir - The directory to traverse.
- * @param {string[]} gitignorePatterns - The patterns from .gitignore files.
+ * @param {Object} parentIg - The parent ignore instance
  * @param {string} repoRoot - The root directory of the repository.
+ * @param {string[]} additionalPatterns - Additional patterns to ignore.
  * @returns {string} - The file contents.
  */
-function generateContentFile(dir, parentGitignorePatterns, repoRoot) {
+function generateContentFile(dir, parentIg, repoRoot, additionalPatterns) {
     let contentFile = '';
     const entries = fs.readdirSync(dir);
 
-    // Get gitignore patterns for this directory
-    const gitignorePatterns = [...parentGitignorePatterns, ...getGitignorePatterns(dir, repoRoot)];
+    // Create new ignore instance for this directory
+    const ig = ignore().add(parentIg);
+
+    // Add patterns from this directory's .gitignore if it exists
+    const dirPatterns = readGitignorePatterns(dir);
+    if (dirPatterns.length > 0) {
+        ig.add(dirPatterns);
+    }
 
     for (const entry of entries) {
         const fullPath = path.join(dir, entry);
+        const stats = fs.statSync(fullPath);
+        let relativePath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
 
-        if (shouldIgnore(fullPath, gitignorePatterns, repoRoot)) {
+        if (stats.isDirectory()) {
+            relativePath += '/';
+        }
+
+        if (ig.ignores(relativePath)) {
             continue;
         }
 
-        const stats = fs.statSync(fullPath);
-
         if (stats.isDirectory()) {
-            contentFile += generateContentFile(fullPath, gitignorePatterns, repoRoot);
+            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns);
         } else if (isTextFile(fullPath)) {
-            const relativePath = path.relative(repoRoot, fullPath);
             contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
             contentFile += `FILE: ${relativePath}\n`;
             contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
@@ -231,15 +211,17 @@ function serializeRepo(options) {
         additionalIgnorePatterns = []
     } = options;
 
-    // Start with default patterns, add root .gitignore patterns and any additional patterns
-    const gitignorePatterns = [
-        ...DEFAULT_IGNORE_PATTERNS,
-        ...additionalIgnorePatterns,
-        ...getGitignorePatterns(repoRoot, repoRoot)
-    ];
+    // Create initial ignore instance with default patterns
+    const ig = createInitialIgnore(additionalIgnorePatterns);
 
-    const structure = generateStructure(repoRoot, gitignorePatterns, repoRoot);
-    const content = generateContentFile(repoRoot, gitignorePatterns, repoRoot);
+    // Add patterns from root .gitignore
+    const rootPatterns = readGitignorePatterns(repoRoot);
+    if (rootPatterns.length > 0) {
+        ig.add(rootPatterns);
+    }
+
+    const structure = generateStructure(repoRoot, ig, repoRoot, '', additionalIgnorePatterns);
+    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns);
 
     // Ensure output directory exists
     fs.mkdirSync(outputDir, { recursive: true });

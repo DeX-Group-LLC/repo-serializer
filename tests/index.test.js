@@ -2,12 +2,19 @@ const { serializeRepo, DEFAULT_IGNORE_PATTERNS } = require('../src/index');
 const fs = require('fs');
 const path = require('path');
 const tmp = require('tmp');
+const os = require('os');
 
 describe('repo-serializer', () => {
     let tmpDir;
     let outputDir;
 
     beforeEach(() => {
+        // Restore all mocks
+        jest.restoreAllMocks();
+
+        // Mock console.log to prevent output in tests
+        jest.spyOn(console, 'log').mockImplementation();
+
         // Create a temporary directory for test files
         tmpDir = tmp.dirSync({ unsafeCleanup: true });
         outputDir = tmp.dirSync({ unsafeCleanup: true });
@@ -90,7 +97,6 @@ describe('repo-serializer', () => {
     test('DEFAULT_IGNORE_PATTERNS contains expected patterns', () => {
         expect(DEFAULT_IGNORE_PATTERNS).toContain('.git/');
         expect(DEFAULT_IGNORE_PATTERNS).toContain('package-lock.json');
-        expect(DEFAULT_IGNORE_PATTERNS).toContain('node_modules/');
     });
 
     test('serializeRepo handles additional ignore patterns', () => {
@@ -141,5 +147,84 @@ describe('repo-serializer', () => {
         expect(structure).toContain(`${rootFolderName}/`);
         expect(structure).toContain('level1/');
         expect(structure).toContain('level2/');
+    });
+
+    test('serializeRepo handles binary files', () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+        const repoDir = path.join(tmpDir, 'test-repo');
+        fs.mkdirSync(repoDir);
+
+        // Create a binary file
+        const binaryFile = path.join(repoDir, 'test.bin');
+        const buffer = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+        fs.writeFileSync(binaryFile, buffer);
+
+        const outputDir = path.join(tmpDir, 'output');
+        serializeRepo({
+            repoRoot: repoDir,
+            outputDir,
+            structureFile: 'structure.txt',
+            contentFile: 'content.txt'
+        });
+
+        const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+        expect(content).not.toContain('test.bin'); // Binary file should not be included in content
+    });
+
+    test('serializeRepo handles file read errors', () => {
+        const testFile = path.join(tmpDir.name, 'error.txt');
+        fs.writeFileSync(testFile, 'test content');
+
+        // Mock fs.openSync to throw an error
+        const originalOpenSync = fs.openSync;
+        jest.spyOn(fs, 'openSync').mockImplementation((path, ...args) => {
+            if (path.includes('error.txt')) {
+                throw new Error('EACCES: permission denied');
+            }
+            return originalOpenSync(path, ...args);
+        });
+
+        // Spy on console.error
+        const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+        // Execute and expect no throw
+        expect(() => {
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt'
+            });
+        }).not.toThrow();
+
+        // Verify error was logged
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+            expect.stringContaining(`Error reading file ${testFile}: EACCES: permission denied`)
+        );
+
+        // Restore original fs.openSync
+        fs.openSync.mockRestore();
+        consoleErrorSpy.mockRestore();
+
+        const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
+        expect(content).not.toContain('error.txt'); // File with read error should not be included in content
+    });
+
+    test('serializeRepo handles empty files', () => {
+        const emptyFile = path.join(tmpDir.name, 'empty.txt');
+        fs.writeFileSync(emptyFile, '');
+
+        serializeRepo({
+            repoRoot: tmpDir.name,
+            outputDir: outputDir.name,
+            structureFile: 'structure.txt',
+            contentFile: 'content.txt'
+        });
+
+        // Verify empty file is included in content
+        const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
+        expect(content).toContain('empty.txt');
+        expect(content).toContain('FILE: empty.txt');
+        expect(content).toContain('END FILE: empty.txt');
     });
 });
