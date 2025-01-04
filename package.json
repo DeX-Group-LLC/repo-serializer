@@ -1,0 +1,32 @@
+{
+  "name": "repo-serializer",
+  "version": "1.0.0",
+  "description": "A tool to serialize a repository's structure and contents into readable text files",
+  "main": "src/index.js",
+  "bin": {
+    "repo-serialize": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "repository",
+    "serializer",
+    "documentation",
+    "code-analysis"
+  ],
+  "author": "DeX Group, LLC",
+  "license": "MIT",
+  "homepage": "https://github.com/DeX-Group-LLC/repo-serializer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DeX-Group-LLC/repo-serializer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DeX-Group-LLC/repo-serializer/issues"
+  },
+  "dependencies": {
+    "commander": "^11.0.0"
+  }
+}
