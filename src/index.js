@@ -55,12 +55,7 @@ function parseFileSize(size = DEFAULT_MAX_FILE_SIZE) {
     }
 
     // Convert to string and trim
-    const sizeStr = String(size).trim().toUpperCase();
-
-    // If it's just a number, parse it as bytes
-    if (/^\d+$/.test(sizeStr)) {
-        return parseInt(sizeStr, 10);
-    }
+    const sizeStr = String(size).replace(/\s+/g, '').toUpperCase();
 
     // Parse with units
     const match = sizeStr.match(/^(\d+)\s*(B|KB|MB|GB)?$/);
@@ -69,14 +64,14 @@ function parseFileSize(size = DEFAULT_MAX_FILE_SIZE) {
     }
 
     const value = parseInt(match[1], 10);
-    const unit = match[2] || 'B';
+    const unit = match[2];
 
     switch (unit) {
+        default:
         case 'B': return value;
         case 'KB': return value * 1024;
         case 'MB': return value * 1024 * 1024;
         case 'GB': return value * 1024 * 1024 * 1024;
-        default: throw new Error(`Invalid file size unit: ${unit}`);
     }
 }
 
@@ -104,7 +99,7 @@ function prettyFileSize(size) {
  * @param {number} maxFileSize - Maximum file size in bytes
  * @returns {boolean} - True if the file is a text file and within size limit
  */
-function isTextFile(filePath, maxFileSize = 8192) {
+function isTextFile(filePath, maxFileSize) {
     try {
         const stats = fs.statSync(filePath);
         if (stats.size > maxFileSize) {
@@ -160,7 +155,7 @@ function readGitignorePatterns(dir) {
  * @param {boolean} [ignoreDefaultPatterns=false] - Whether to skip adding default ignore patterns
  * @returns {Object} - Ignore instance with configured patterns
  */
-function createInitialIgnore(additionalPatterns, ignoreDefaultPatterns = false) {
+function createInitialIgnore(additionalPatterns, ignoreDefaultPatterns) {
     const ig = ignore();
     ig.add(ALWAYS_IGNORE_PATTERNS);
 
@@ -186,7 +181,7 @@ function createInitialIgnore(additionalPatterns, ignoreDefaultPatterns = false) 
  * @param {boolean} processGitignore - Whether to process .gitignore files
  * @returns {string} - The file and folder structure.
  */
-function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, processGitignore = true) {
+function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, processGitignore) {
     let structure = '';
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -249,7 +244,7 @@ function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, 
  * @param {boolean} processGitignore - Whether to process .gitignore files
  * @returns {string} - The file contents.
  */
-function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize = 8192, processGitignore = true) {
+function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore) {
     let contentFile = '';
     const entries = fs.readdirSync(dir);
 
@@ -317,7 +312,7 @@ function serializeRepo(options) {
         additionalIgnorePatterns = [],
         force = false,
         isCliCall = false,
-        maxFileSize = 8192,
+        maxFileSize = DEFAULT_MAX_FILE_SIZE,
         ignoreDefaultPatterns = false,
         noGitignore = false
     } = options;
