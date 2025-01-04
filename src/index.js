@@ -142,6 +142,11 @@ function generateStructure(dir, parentGitignorePatterns, repoRoot, prefix = '') 
     let structure = '';
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
+    // Add root folder name if this is the root level (empty prefix)
+    if (prefix === '') {
+        structure += `${path.basename(dir)}/\n`;
+    }
+
     // Get gitignore patterns for this directory
     const gitignorePatterns = [...parentGitignorePatterns, ...getGitignorePatterns(dir, repoRoot)];
 

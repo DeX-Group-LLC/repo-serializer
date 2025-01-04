@@ -31,6 +31,35 @@ describe('repo-serializer', () => {
         outputDir.removeCallback();
     });
 
+    test('serializeRepo generates structure with root folder name', () => {
+        const rootFolderName = path.basename(tmpDir.name);
+
+        serializeRepo({
+            repoRoot: tmpDir.name,
+            outputDir: outputDir.name,
+            structureFile: 'structure.txt',
+            contentFile: 'content.txt'
+        });
+
+        // Check if output files exist
+        expect(fs.existsSync(path.join(outputDir.name, 'structure.txt'))).toBe(true);
+        expect(fs.existsSync(path.join(outputDir.name, 'content.txt'))).toBe(true);
+
+        // Read and verify structure file
+        const structure = fs.readFileSync(path.join(outputDir.name, 'structure.txt'), 'utf-8');
+
+        // First line should be the root folder name
+        const lines = structure.split('\n');
+        expect(lines[0]).toBe(rootFolderName + '/');
+
+        // Rest of structure should be indented under root
+        expect(structure).toContain('file1.txt');
+        expect(structure).toContain('src/');
+        expect(structure).toContain('file2.js');
+        expect(structure).not.toContain('ignored.txt');
+        expect(structure).not.toContain('test.log');
+    });
+
     test('serializeRepo generates structure and content files', () => {
         serializeRepo({
             repoRoot: tmpDir.name,
@@ -91,6 +120,26 @@ describe('repo-serializer', () => {
         });
 
         const structure = fs.readFileSync(path.join(outputDir.name, 'structure.txt'), 'utf-8');
+        const rootFolderName = path.basename(tmpDir.name);
+        expect(structure).toContain(`${rootFolderName}/`);
         expect(structure).toContain('empty/');
+    });
+
+    test('serializeRepo handles nested empty directories', () => {
+        fs.mkdirSync(path.join(tmpDir.name, 'level1'));
+        fs.mkdirSync(path.join(tmpDir.name, 'level1', 'level2'));
+
+        serializeRepo({
+            repoRoot: tmpDir.name,
+            outputDir: outputDir.name,
+            structureFile: 'structure.txt',
+            contentFile: 'content.txt'
+        });
+
+        const structure = fs.readFileSync(path.join(outputDir.name, 'structure.txt'), 'utf-8');
+        const rootFolderName = path.basename(tmpDir.name);
+        expect(structure).toContain(`${rootFolderName}/`);
+        expect(structure).toContain('level1/');
+        expect(structure).toContain('level2/');
     });
 });
