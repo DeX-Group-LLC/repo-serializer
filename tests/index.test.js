@@ -172,8 +172,7 @@ describe('repo-serializer', () => {
         fs.writeFileSync(testFile, 'test content');
 
         // Mock fs.openSync to throw an error
-        const originalOpenSync = fs.openSync;
-        fs.openSync = jest.fn().mockImplementation((path) => {
+        jest.spyOn(fs, 'openSync').mockImplementation((path) => {
             if (path.includes('error.txt')) {
                 throw new Error('EACCES: permission denied');
             }
@@ -199,7 +198,7 @@ describe('repo-serializer', () => {
         );
 
         // Restore original fs.openSync
-        fs.openSync = originalOpenSync;
+        fs.openSync.mockRestore();
         consoleErrorSpy.mockRestore();
 
         const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
