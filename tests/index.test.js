@@ -177,11 +177,11 @@ describe('repo-serializer', () => {
 
         // Mock fs.openSync to throw an error
         const originalOpenSync = fs.openSync;
-        jest.spyOn(fs, 'openSync').mockImplementation((path) => {
+        jest.spyOn(fs, 'openSync').mockImplementation((path, ...args) => {
             if (path.includes('error.txt')) {
                 throw new Error('EACCES: permission denied');
             }
-            return originalOpenSync(path);
+            return originalOpenSync(path, ...args);
         });
 
         // Spy on console.error
