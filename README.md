@@ -1,4 +1,10 @@
 # repo-serializer
+[![Build Status](https://github.com/DeX-Group-LLC/repo-serializer/actions/workflows/tests.yml/badge.svg)](https://github.com/DeX-Group-LLC/repo-serializer/actions/workflows/tests.yml)
+[![npm version](https://badge.fury.io/js/repo-serializer.svg)](https://badge.fury.io/js/repo-serializer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Dependencies](https://img.shields.io/librariesio/release/npm/repo-serializer)](https://libraries.io/npm/repo-serializer)
+[![Coverage Status](https://coveralls.io/repos/github/DeX-Group-LLC/repo-serializer/badge.svg?branch=main)](https://coveralls.io/github/DeX-Group-LLC/repo-serializer?branch=main)
+[![Install Size](https://packagephobia.com/badge?p=repo-serializer)](https://packagephobia.com/result?p=repo-serializer)
 
 📄 A command-line tool that creates a human-readable snapshot of your codebase. It generates two files:
 - A tree view of your repository structure
