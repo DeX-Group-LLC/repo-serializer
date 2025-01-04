@@ -1006,26 +1006,32 @@ describe('repo-serializer', () => {
 
             test('handles large files', () => {
                 /**
-                 * Ensures that files exceeding size limits
-                 * are properly excluded from content
+                 * Ensures that large files are included in the output
+                 * while still being checked for human-readability up
+                 * to the maxFileSize limit
                  */
 
                 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
-                const largeFile = path.join(tmpDir, 'large.txt');
+                const repoDir = path.join(tmpDir, 'test-repo');
+                const outputDir = path.join(tmpDir, 'output');
+                fs.mkdirSync(repoDir);
+                fs.mkdirSync(outputDir);
 
-                // Create a file larger than 8KB (default max size)
-                const largeContent = Buffer.alloc(8193).fill('x');
+                // Create a file larger than 8KB (default max size) with text content
+                const largeFile = path.join(repoDir, 'large.txt');
+                const largeContent = Buffer.alloc(8194 * 16).fill('x');
                 fs.writeFileSync(largeFile, largeContent);
 
                 serializeRepo({
-                    repoRoot: tmpDir,
-                    outputDir: tmpDir,
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
                     structureFile: 'structure.txt',
                     contentFile: 'content.txt'
                 });
 
-                const content = fs.readFileSync(path.join(tmpDir, 'content.txt'), 'utf-8');
-                expect(content).not.toContain('FILE: large.txt');
+                const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+                expect(content).toContain('FILE: large.txt');
+                expect(content).toContain('x'.repeat(8194 * 16));
             });
 
             test('validates maxFileSize limits', () => {
@@ -1034,15 +1040,21 @@ describe('repo-serializer', () => {
                  * validated against min/max constraints
                  */
 
+                const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+                const repoDir = path.join(testDir, 'test-repo');
+                const outputDir = path.join(testDir, 'output');
+                fs.mkdirSync(repoDir);
+                fs.mkdirSync(outputDir);
+
                 expect(() => serializeRepo({
-                    repoRoot: tmpDir.name,
-                    outputDir: outputDir.name,
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
                     maxFileSize: MIN_FILE_SIZE - 1
                 })).toThrow(`Max file size must be between`);
 
                 expect(() => serializeRepo({
-                    repoRoot: tmpDir.name,
-                    outputDir: outputDir.name,
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
                     maxFileSize: MAX_FILE_SIZE + 1
                 })).toThrow(`Max file size must be between`);
             });
