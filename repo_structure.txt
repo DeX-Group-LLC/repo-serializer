@@ -1,0 +1,16 @@
+repo-serializer/
+├── .github/
+│   ├── workflows/
+│   │   ├── publish.yml
+│   │   └── tests.yml
+│   └── dependabot.yml
+├── bin/
+│   └── cli.js
+├── src/
+│   └── index.js
+├── tests/
+│   └── index.test.js
+├── .gitignore
+├── LICENSE
+├── package.json
+└── README.md
