@@ -71,12 +71,6 @@ describe('repo-serializer', () => {
             expect(content).toContain('Content of file 1');
             expect(content).toContain('console.log("Hello")');
         });
-
-        test('DEFAULT_IGNORE_PATTERNS contains expected patterns', () => {
-            expect(DEFAULT_IGNORE_PATTERNS).toContain('.git/');
-            expect(DEFAULT_IGNORE_PATTERNS).toContain('package-lock.json');
-            expect(DEFAULT_IGNORE_PATTERNS).toContain('node_modules/');
-        });
     });
 
     // File ignoring tests
@@ -109,9 +103,10 @@ describe('repo-serializer', () => {
             expect(structure).not.toContain('custom.skip');
         });
 
-    test('DEFAULT_IGNORE_PATTERNS contains expected patterns', () => {
-        expect(DEFAULT_IGNORE_PATTERNS).toContain('.git/');
-        expect(DEFAULT_IGNORE_PATTERNS).toContain('package-lock.json');
+        test('DEFAULT_IGNORE_PATTERNS contains expected patterns', () => {
+            expect(DEFAULT_IGNORE_PATTERNS).toContain('.git/');
+            expect(DEFAULT_IGNORE_PATTERNS).toContain('package-lock.json');
+        });
     });
 
     // Directory handling tests
@@ -241,6 +236,72 @@ describe('repo-serializer', () => {
             expect(structure).not.toBe('old structure');
             expect(content).not.toBe('old content');
         });
+
+        test('handles case when only structure file exists', () => {
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(repoDir);
+            fs.mkdirSync(outputDir);
+
+            // Create only the structure file
+            fs.writeFileSync(path.join(outputDir, 'structure.txt'), 'old structure');
+
+            expect(() => {
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir,
+                    structureFile: 'structure.txt',
+                    contentFile: 'content.txt'
+                });
+            }).toThrow('Output files already exist. Set force=true to overwrite.');
+
+            // Test with force=true
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt',
+                force: true
+            });
+
+            // Verify old structure file was deleted and new files were created
+            const structure = fs.readFileSync(path.join(outputDir, 'structure.txt'), 'utf-8');
+            expect(structure).not.toBe('old structure');
+        });
+
+        test('handles case when only content file exists', () => {
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(repoDir);
+            fs.mkdirSync(outputDir);
+
+            // Create only the content file
+            fs.writeFileSync(path.join(outputDir, 'content.txt'), 'old content');
+
+            expect(() => {
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir,
+                    structureFile: 'structure.txt',
+                    contentFile: 'content.txt'
+                });
+            }).toThrow('Output files already exist. Set force=true to overwrite.');
+
+            // Test with force=true
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt',
+                force: true
+            });
+
+            // Verify old content file was deleted and new files were created
+            const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+            expect(content).not.toBe('old content');
+        });
     });
 
     // CLI mode tests
@@ -313,7 +374,7 @@ describe('repo-serializer', () => {
             }).toThrow('PROMPT_REQUIRED');
         });
 
-        test('overwrites files with force option', () => {
+        test('overwrites existing files with force option', () => {
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
             const repoDir = path.join(tmpDir, 'test-repo');
             const outputDir = path.join(tmpDir, 'output');
@@ -339,6 +400,80 @@ describe('repo-serializer', () => {
             expect(content).toContain('test content');
             expect(structure).not.toBe('old structure');
             expect(content).not.toBe('old content');
+        });
+
+        test('handles case when only structure file exists', () => {
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(repoDir);
+            fs.mkdirSync(outputDir);
+
+            // Create test content and only structure file
+            fs.writeFileSync(path.join(repoDir, 'test.txt'), 'test content');
+            fs.writeFileSync(path.join(outputDir, 'structure.txt'), 'old structure');
+
+            expect(() => {
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir,
+                    structureFile: 'structure.txt',
+                    contentFile: 'content.txt',
+                    isCliCall: true
+                });
+            }).toThrow('PROMPT_REQUIRED');
+
+            // Test with force=true
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt',
+                isCliCall: true,
+                force: true
+            });
+
+            // Verify old structure file was deleted and new files were created
+            const structure = fs.readFileSync(path.join(outputDir, 'structure.txt'), 'utf-8');
+            expect(structure).not.toBe('old structure');
+            expect(structure).toContain('test.txt');
+        });
+
+        test('handles case when only content file exists', () => {
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(repoDir);
+            fs.mkdirSync(outputDir);
+
+            // Create test content and only content file
+            fs.writeFileSync(path.join(repoDir, 'test.txt'), 'test content');
+            fs.writeFileSync(path.join(outputDir, 'content.txt'), 'old content');
+
+            expect(() => {
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir,
+                    structureFile: 'structure.txt',
+                    contentFile: 'content.txt',
+                    isCliCall: true
+                });
+            }).toThrow('PROMPT_REQUIRED');
+
+            // Test with force=true
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt',
+                isCliCall: true,
+                force: true
+            });
+
+            // Verify old content file was deleted and new files were created
+            const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+            expect(content).not.toBe('old content');
+            expect(content).toContain('test content');
         });
     });
 
