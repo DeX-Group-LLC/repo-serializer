@@ -4,7 +4,7 @@
   "description": "A tool to serialize a repository's structure and contents into readable text files",
   "main": "src/index.js",
   "bin": {
-    "repo-serialize": "bin/cli.js"
+    "repo-serializer": "bin/cli.js"
   },
   "scripts": {
     "start": "node bin/cli.js",
