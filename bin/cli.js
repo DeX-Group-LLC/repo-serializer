@@ -1,16 +1,23 @@
 #!/usr/bin/env node
 
 const { program } = require('commander');
-const { serializeRepo } = require('../src/index');
 const path = require('path');
 const fs = require('fs');
 const readline = require('readline');
+const { version } = require('../package.json');
+const { ALWAYS_IGNORE_PATTERNS, DEFAULT_IGNORE_PATTERNS, DEFAULT_MAX_FILE_SIZE, MIN_FILE_SIZE, MAX_FILE_SIZE, parseFileSize, prettyFileSize, serializeRepo } = require('../src/index');
 
+// Setup readline interface for prompts
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
 
+/**
+ * Prompts the user with a question and returns their response
+ * @param {string} question - The question to ask
+ * @returns {Promise<string>} - The user's response in lowercase, trimmed
+ */
 async function prompt(question) {
     return new Promise((resolve) => {
         rl.question(question, (answer) => {
@@ -19,6 +26,10 @@ async function prompt(question) {
     });
 }
 
+/**
+ * Handles the case where output files already exist
+ * Prompts user for confirmation to overwrite
+ */
 async function handleExistingFiles(outputDir, structureFile, contentFile) {
     const structurePath = path.join(outputDir, structureFile);
     const contentPath = path.join(outputDir, contentFile);
@@ -34,14 +45,35 @@ async function handleExistingFiles(outputDir, structureFile, contentFile) {
 
 program
     .name('repo-serialize')
-    .description('Serialize a repository\'s structure and contents into readable text files')
-    .version('1.0.0')
-    .option('-d, --dir <directory>', 'Target directory to serialize', process.cwd())
-    .option('-o, --output <directory>', 'Output directory for generated files', process.cwd())
-    .option('--structure-file <filename>', 'Name of the structure output file', 'repo_structure.txt')
-    .option('--content-file <filename>', 'Name of the content output file', 'repo_content.txt')
-    .option('--ignore <patterns...>', 'Additional patterns to ignore')
-    .option('-f, --force', 'Overwrite existing files without prompting')
+    .description([
+        'Serialize a repository\'s structure and contents into readable text files',
+        '',
+        'Always ignored patterns (cannot be overridden):',
+        ...ALWAYS_IGNORE_PATTERNS.map(pattern => `- ${pattern}`),
+        '',
+        'Default ignored patterns (can be included with --all):',
+        ...DEFAULT_IGNORE_PATTERNS.map(pattern => `- ${pattern}`)
+    ].join('\n'))
+
+    // Input/Output Options
+    .option('-d, --dir <directory>', 'Target directory to serialize (default: current working directory)', process.cwd())
+    .option('-o, --output <directory>', 'Output directory for generated files (default: current working directory)', process.cwd())
+    .option('-s, --structure-file <filename>', 'Name of the structure output file (default: repo_structure.txt)', 'repo_structure.txt')
+    .option('-c, --content-file <filename>', 'Name of the content output file (default: repo_content.txt)', 'repo_content.txt')
+
+    // Processing Options
+    .option('-m, --max-file-size <size>', `Maximum file size to process (${prettyFileSize(MIN_FILE_SIZE)}-${prettyFileSize(MAX_FILE_SIZE)}). Accepts units: B, KB, MB (default: ${prettyFileSize(DEFAULT_MAX_FILE_SIZE)})`, prettyFileSize(DEFAULT_MAX_FILE_SIZE))
+    .option('-a, --all', 'Disable default ignore patterns (default: false)')
+    .option('-g, --no-gitignore', 'Disable .gitignore processing (enabled by default)')
+    .option('-i, --ignore <patterns...>', 'Additional patterns to ignore')
+
+    // Behavior Options
+    .option('-f, --force', 'Overwrite existing files without prompting (default: false)')
+
+    // Information Options
+    .version(version, '-v, --version', 'Display the version number')
+    .helpOption('-h, --help', 'Display help information')
+
     .action(async (options) => {
         try {
             const config = {
@@ -51,7 +83,10 @@ program
                 contentFile: options.contentFile,
                 additionalIgnorePatterns: options.ignore || [],
                 force: options.force,
-                isCliCall: true
+                isCliCall: true,
+                maxFileSize: parseFileSize(options.maxFileSize),
+                ignoreDefaultPatterns: options.all,
+                noGitignore: !options.gitignore  // Commander sets gitignore=false when --no-gitignore is used
             };
 
             try {
