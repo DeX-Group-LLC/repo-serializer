@@ -10,6 +10,8 @@ const ignore = require('ignore');
  * @property {string} structureFile - Name of the file to write structure to
  * @property {string} contentFile - Name of the file to write contents to
  * @property {string[]} additionalIgnorePatterns - Additional patterns to ignore
+ * @property {boolean} [force] - Whether to overwrite existing files without prompting
+ * @property {boolean} [isCliCall] - Whether this is being called from the CLI
  */
 
 /**
@@ -208,8 +210,26 @@ function serializeRepo(options) {
         outputDir,
         structureFile,
         contentFile,
-        additionalIgnorePatterns = []
+        additionalIgnorePatterns = [],
+        force = false,
+        isCliCall = false
     } = options;
+
+    // Check if output files already exist
+    const structurePath = path.join(outputDir, structureFile);
+    const contentPath = path.join(outputDir, contentFile);
+
+    if (fs.existsSync(structurePath) || fs.existsSync(contentPath)) {
+        if (force) {
+            // Delete existing files when force is true
+            if (fs.existsSync(structurePath)) fs.unlinkSync(structurePath);
+            if (fs.existsSync(contentPath)) fs.unlinkSync(contentPath);
+        } else if (isCliCall) {
+            throw new Error('PROMPT_REQUIRED');
+        } else {
+            throw new Error('Output files already exist. Set force=true to overwrite.');
+        }
+    }
 
     // Create initial ignore instance with default patterns
     const ig = createInitialIgnore(additionalIgnorePatterns);
