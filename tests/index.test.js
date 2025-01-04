@@ -9,6 +9,10 @@ describe('repo-serializer', () => {
     let outputDir;
 
     beforeEach(() => {
+        // Restore all mocks
+        jest.restoreAllMocks();
+
+        // Mock console.log to prevent output in tests
         jest.spyOn(console, 'log').mockImplementation();
 
         // Create a temporary directory for test files
