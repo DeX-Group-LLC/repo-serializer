@@ -37,6 +37,7 @@ jobs:
         parallel: true
 
   finish:
+    name: Coveralls Finished
     needs: test
     if: ${{ always() }}
     runs-on: ubuntu-latest
