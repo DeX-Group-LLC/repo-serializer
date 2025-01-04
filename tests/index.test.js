@@ -1,8 +1,15 @@
-const { serializeRepo, ALWAYS_IGNORE_PATTERNS, DEFAULT_IGNORE_PATTERNS, parseFileSize, prettyFileSize, MIN_FILE_SIZE, MAX_FILE_SIZE, DEFAULT_MAX_FILE_SIZE } = require('../src/index');
+/**
+ * Tests for repo-serializer module
+ * This test suite verifies the functionality of the repository serialization tool,
+ * which creates text-based representations of repository contents and structure.
+ * The tests cover basic functionality, file handling, CLI operations, and edge cases.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const tmp = require('tmp');
 const os = require('os');
+const { serializeRepo, ALWAYS_IGNORE_PATTERNS, DEFAULT_IGNORE_PATTERNS, parseFileSize, prettyFileSize, MIN_FILE_SIZE, MAX_FILE_SIZE, DEFAULT_MAX_FILE_SIZE } = require('../src/index');
 
 describe('repo-serializer', () => {
     let tmpDir;
@@ -40,7 +47,20 @@ describe('repo-serializer', () => {
 
     // Basic functionality tests
     describe('basic functionality', () => {
+        /**
+         * Tests core functionality of the serializer:
+         * - Default directory handling
+         * - Structure generation
+         * - Content generation
+         * - Basic file operations
+         */
+
         test('uses current working directory as default for repoRoot and outputDir', () => {
+            /**
+             * Verifies that the serializer uses process.cwd() as the default
+             * for both repository root and output directory when not specified
+             */
+
             // Mock process.cwd()
             const originalCwd = process.cwd;
             const mockCwd = jest.fn().mockReturnValue(tmpDir.name);
@@ -65,6 +85,11 @@ describe('repo-serializer', () => {
         });
 
         test('generates structure with root folder name', () => {
+            /**
+             * Ensures that the generated structure file starts with
+             * the root folder name and contains correct file hierarchy
+             */
+
             const rootFolderName = path.basename(tmpDir.name);
 
             serializeRepo({
@@ -83,6 +108,11 @@ describe('repo-serializer', () => {
         });
 
         test('generates structure and content files', () => {
+            /**
+             * Verifies that both structure and content files are generated
+             * with correct file contents and proper formatting
+             */
+
             serializeRepo({
                 repoRoot: tmpDir.name,
                 outputDir: outputDir.name,
@@ -99,7 +129,20 @@ describe('repo-serializer', () => {
 
     // File ignoring tests
     describe('file ignoring', () => {
+        /**
+         * Tests file exclusion functionality:
+         * - .gitignore pattern handling
+         * - Default ignore patterns
+         * - Custom ignore patterns
+         * - Ignore pattern overrides
+         */
+
         test('handles .gitignore patterns', () => {
+            /**
+             * Ensures that files matching .gitignore patterns are properly
+             * excluded from both structure and content files
+             */
+
             serializeRepo({
                 repoRoot: tmpDir.name,
                 outputDir: outputDir.name,
@@ -113,6 +156,11 @@ describe('repo-serializer', () => {
         });
 
         test('respects noGitignore option', () => {
+            /**
+             * Verifies that the noGitignore option correctly overrides
+             * .gitignore pattern handling when specified
+             */
+
             // Create a nested .gitignore to ensure both functions are tested
             fs.mkdirSync(path.join(tmpDir.name, 'nested'));
             fs.writeFileSync(path.join(tmpDir.name, 'nested', '.gitignore'), '*.txt');
@@ -147,6 +195,11 @@ describe('repo-serializer', () => {
         });
 
         test('handles additional ignore patterns', () => {
+            /**
+             * Tests that custom ignore patterns are properly applied
+             * in addition to default and .gitignore patterns
+             */
+
             fs.writeFileSync(path.join(tmpDir.name, 'custom.skip'), 'Skip this');
 
             serializeRepo({
@@ -162,6 +215,11 @@ describe('repo-serializer', () => {
         });
 
         test('respects ignoreDefaultPatterns option', () => {
+            /**
+             * Verifies that the ignoreDefaultPatterns option correctly
+             * disables the built-in default ignore patterns
+             */
+
             // Create a dot file that would normally be ignored
             fs.writeFileSync(path.join(tmpDir.name, '.hidden'), 'Hidden file content');
             fs.writeFileSync(path.join(tmpDir.name, 'package-lock.json'), '{}');
@@ -193,10 +251,20 @@ describe('repo-serializer', () => {
         });
 
         test('ALWAYS_IGNORE_PATTERNS contains expected patterns', () => {
+            /**
+             * Ensures that critical patterns like .git/ are always
+             * included in the ignore list
+             */
+
             expect(ALWAYS_IGNORE_PATTERNS).toContain('.git/');
         });
 
         test('DEFAULT_IGNORE_PATTERNS contains expected patterns', () => {
+            /**
+             * Verifies that common ignore patterns are included
+             * in the default ignore list
+             */
+
             expect(DEFAULT_IGNORE_PATTERNS).toContain('.*');
             expect(DEFAULT_IGNORE_PATTERNS).toContain('.*/');
             expect(DEFAULT_IGNORE_PATTERNS).toContain('package-lock.json');
@@ -205,6 +273,13 @@ describe('repo-serializer', () => {
 
     // Directory handling tests
     describe('directory handling', () => {
+        /**
+         * Tests directory-specific functionality:
+         * - Empty directory handling
+         * - Nested directory structures
+         * - Directory permissions
+         */
+
         test('handles empty directories', () => {
             fs.mkdirSync(path.join(tmpDir.name, 'empty'));
 
@@ -238,6 +313,14 @@ describe('repo-serializer', () => {
 
     // Library mode tests
     describe('library mode', () => {
+        /**
+         * Tests programmatic usage of the serializer:
+         * - API behavior
+         * - Error handling
+         * - File overwrite protection
+         * - Output file management
+         */
+
         test('succeeds when no files exist', () => {
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
             const repoDir = path.join(tmpDir, 'test-repo');
@@ -454,6 +537,14 @@ describe('repo-serializer', () => {
 
     // CLI mode tests
     describe('CLI mode', () => {
+        /**
+         * Tests command-line interface functionality:
+         * - User interaction
+         * - Command-line options
+         * - Error messaging
+         * - File overwrite prompts
+         */
+
         test('succeeds when no files exist', () => {
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
             const repoDir = path.join(tmpDir, 'test-repo');
@@ -704,86 +795,257 @@ describe('repo-serializer', () => {
         expect(content).toContain('END FILE: empty.txt');
     });
 
-    // File size parsing tests
-    describe('parseFileSize', () => {
-        test('handles null/undefined input', () => {
-            expect(parseFileSize(null)).toBe(DEFAULT_MAX_FILE_SIZE);
-            expect(parseFileSize(undefined)).toBe(DEFAULT_MAX_FILE_SIZE);
-        });
+    // File handling edge cases
+    describe('file handling edge cases', () => {
+        /**
+         * Tests special file handling scenarios:
+         * - Binary files
+         * - Empty files
+         * - Permission errors
+         * - Size limits
+         */
 
-        test('handles numeric input', () => {
-            expect(parseFileSize(1024)).toBe(1024);
-            // Test string number without units
-            expect(parseFileSize('1024')).toBe(1024);
-            expect(parseFileSize('512')).toBe(512);
-        });
+        test('handles binary files', () => {
+            /**
+             * Verifies that binary files are properly detected and
+             * excluded from the content file while still appearing
+             * in the structure file
+             */
 
-        test('parses string inputs with different units', () => {
-            // Test bytes unit explicitly
-            expect(parseFileSize('512B')).toBe(512);
-            expect(parseFileSize('1024B')).toBe(1024);
-            // Test other units
-            expect(parseFileSize('1KB')).toBe(1024);
-            expect(parseFileSize('1 KB')).toBe(1024);
-            expect(parseFileSize('1MB')).toBe(1024 * 1024);
-            expect(parseFileSize('1GB')).toBe(1024 * 1024 * 1024);
-            // Test no unit (defaults to bytes)
-            expect(parseFileSize('1024')).toBe(1024);
-        });
-
-        test('throws error for invalid formats', () => {
-            expect(() => parseFileSize('invalid')).toThrow('Invalid file size format: invalid');
-            expect(() => parseFileSize('KB')).toThrow('Invalid file size format: KB');
-            expect(() => parseFileSize('1.5KB')).toThrow('Invalid file size format: 1.5KB');
-            expect(() => parseFileSize('-1KB')).toThrow('Invalid file size format: -1KB');
-            expect(() => parseFileSize('1TB')).toThrow('Invalid file size format: 1TB');
-            expect(() => parseFileSize('1PB')).toThrow('Invalid file size format: 1PB');
-        });
-    });
-
-    // Pretty file size tests
-    describe('prettyFileSize', () => {
-        test('formats file sizes correctly', () => {
-            expect(prettyFileSize(512)).toBe('512B');
-            expect(prettyFileSize(1024)).toBe('1KB');
-            expect(prettyFileSize(1024 * 1024)).toBe('1MB');
-            expect(prettyFileSize(1024 * 1024 * 1024)).toBe('1GB');
-        });
-    });
-
-    // File size limit tests
-    describe('file size limits', () => {
-        test('handles large files', () => {
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
-            const largeFile = path.join(tmpDir, 'large.txt');
+            const repoDir = path.join(tmpDir, 'test-repo');
+            fs.mkdirSync(repoDir);
 
-            // Create a file larger than 8KB (default max size)
-            const largeContent = Buffer.alloc(8193).fill('x');
-            fs.writeFileSync(largeFile, largeContent);
+            // Create a binary file
+            const binaryFile = path.join(repoDir, 'test.bin');
+            const buffer = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+            fs.writeFileSync(binaryFile, buffer);
 
+            const outputDir = path.join(tmpDir, 'output');
             serializeRepo({
-                repoRoot: tmpDir,
-                outputDir: tmpDir,
+                repoRoot: repoDir,
+                outputDir,
                 structureFile: 'structure.txt',
                 contentFile: 'content.txt'
             });
 
-            const content = fs.readFileSync(path.join(tmpDir, 'content.txt'), 'utf-8');
-            expect(content).not.toContain('FILE: large.txt');
+            const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+            expect(content).not.toContain('test.bin'); // Binary file should not be included in content
         });
 
-        test('validates maxFileSize limits', () => {
-            expect(() => serializeRepo({
-                repoRoot: tmpDir.name,
-                outputDir: outputDir.name,
-                maxFileSize: MIN_FILE_SIZE - 1
-            })).toThrow(`Max file size must be between`);
+        test('handles file read errors', () => {
+            /**
+             * Ensures that file read errors (e.g., permission denied)
+             * are properly handled and logged without failing the
+             * entire serialization process
+             */
 
-            expect(() => serializeRepo({
+            const testFile = path.join(tmpDir.name, 'error.txt');
+            fs.writeFileSync(testFile, 'test content');
+
+            // Mock fs.openSync to throw an error
+            const originalOpenSync = fs.openSync;
+            jest.spyOn(fs, 'openSync').mockImplementation((path, ...args) => {
+                if (path.includes('error.txt')) {
+                    throw new Error('EACCES: permission denied');
+                }
+                return originalOpenSync(path, ...args);
+            });
+
+            // Spy on console.error
+            const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+            // Execute and expect no throw
+            expect(() => {
+                serializeRepo({
+                    repoRoot: tmpDir.name,
+                    outputDir: outputDir.name,
+                    structureFile: 'structure.txt',
+                    contentFile: 'content.txt'
+                });
+            }).not.toThrow();
+
+            // Verify error was logged
+            expect(consoleErrorSpy).toHaveBeenCalledWith(
+                expect.stringContaining(`Error reading file ${testFile}: EACCES: permission denied`)
+            );
+
+            // Restore original fs.openSync
+            fs.openSync.mockRestore();
+            consoleErrorSpy.mockRestore();
+
+            const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
+            expect(content).not.toContain('error.txt'); // File with read error should not be included in content
+        });
+
+        test('handles empty files', () => {
+            /**
+             * Verifies that empty files are properly included in both
+             * structure and content files with appropriate markers
+             */
+
+            const emptyFile = path.join(tmpDir.name, 'empty.txt');
+            fs.writeFileSync(emptyFile, '');
+
+            serializeRepo({
                 repoRoot: tmpDir.name,
                 outputDir: outputDir.name,
-                maxFileSize: MAX_FILE_SIZE + 1
-            })).toThrow(`Max file size must be between`);
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt'
+            });
+
+            // Verify empty file is included in content
+            const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
+            expect(content).toContain('empty.txt');
+            expect(content).toContain('FILE: empty.txt');
+            expect(content).toContain('END FILE: empty.txt');
+        });
+    });
+
+    // File size handling
+    describe('file size handling', () => {
+        /**
+         * Tests file size related functionality:
+         * - Size parsing
+         * - Size formatting
+         * - Size limits
+         * - Size validation
+         */
+
+        describe('parseFileSize', () => {
+            /**
+             * Tests the file size parsing utility:
+             * - Unit conversions (B, KB, MB, GB)
+             * - Default values
+             * - Error handling
+             */
+
+            test('handles null/undefined input', () => {
+                /**
+                 * Verifies that undefined or null inputs return
+                 * the default maximum file size
+                 */
+
+                expect(parseFileSize(null)).toBe(DEFAULT_MAX_FILE_SIZE);
+                expect(parseFileSize(undefined)).toBe(DEFAULT_MAX_FILE_SIZE);
+            });
+
+            test('handles numeric input', () => {
+                /**
+                 * Ensures that numeric inputs are properly parsed
+                 * both as numbers and numeric strings
+                 */
+
+                expect(parseFileSize(1024)).toBe(1024);
+                // Test string number without units
+                expect(parseFileSize('1024')).toBe(1024);
+                expect(parseFileSize('512')).toBe(512);
+            });
+
+            test('parses string inputs with different units', () => {
+                /**
+                 * Verifies correct parsing of file sizes with
+                 * various unit specifications (B, KB, MB, GB)
+                 */
+
+                // Test bytes unit explicitly
+                expect(parseFileSize('512B')).toBe(512);
+                expect(parseFileSize('1024B')).toBe(1024);
+                // Test other units
+                expect(parseFileSize('1KB')).toBe(1024);
+                expect(parseFileSize('1 KB')).toBe(1024);
+                expect(parseFileSize('1MB')).toBe(1024 * 1024);
+                expect(parseFileSize('1GB')).toBe(1024 * 1024 * 1024);
+                // Test no unit (defaults to bytes)
+                expect(parseFileSize('1024')).toBe(1024);
+            });
+
+            test('throws error for invalid formats', () => {
+                /**
+                 * Ensures proper error handling for invalid
+                 * file size specifications
+                 */
+
+                expect(() => parseFileSize('invalid')).toThrow('Invalid file size format: invalid');
+                expect(() => parseFileSize('KB')).toThrow('Invalid file size format: KB');
+                expect(() => parseFileSize('1.5KB')).toThrow('Invalid file size format: 1.5KB');
+                expect(() => parseFileSize('-1KB')).toThrow('Invalid file size format: -1KB');
+                expect(() => parseFileSize('1TB')).toThrow('Invalid file size format: 1TB');
+                expect(() => parseFileSize('1PB')).toThrow('Invalid file size format: 1PB');
+            });
+        });
+
+        describe('prettyFileSize', () => {
+            /**
+             * Tests the file size formatting utility:
+             * - Human-readable output
+             * - Unit selection
+             * - Formatting consistency
+             */
+
+            test('formats file sizes correctly', () => {
+                /**
+                 * Verifies that file sizes are formatted with
+                 * appropriate units and consistent notation
+                 */
+
+                expect(prettyFileSize(512)).toBe('512B');
+                expect(prettyFileSize(1024)).toBe('1KB');
+                expect(prettyFileSize(1024 * 1024)).toBe('1MB');
+                expect(prettyFileSize(1024 * 1024 * 1024)).toBe('1GB');
+            });
+        });
+
+        describe('file size limits', () => {
+            /**
+             * Tests enforcement of file size limits:
+             * - Maximum size handling
+             * - Minimum size validation
+             * - Size limit overrides
+             */
+
+            test('handles large files', () => {
+                /**
+                 * Ensures that files exceeding size limits
+                 * are properly excluded from content
+                 */
+
+                const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+                const largeFile = path.join(tmpDir, 'large.txt');
+
+                // Create a file larger than 8KB (default max size)
+                const largeContent = Buffer.alloc(8193).fill('x');
+                fs.writeFileSync(largeFile, largeContent);
+
+                serializeRepo({
+                    repoRoot: tmpDir,
+                    outputDir: tmpDir,
+                    structureFile: 'structure.txt',
+                    contentFile: 'content.txt'
+                });
+
+                const content = fs.readFileSync(path.join(tmpDir, 'content.txt'), 'utf-8');
+                expect(content).not.toContain('FILE: large.txt');
+            });
+
+            test('validates maxFileSize limits', () => {
+                /**
+                 * Verifies that file size limits are properly
+                 * validated against min/max constraints
+                 */
+
+                expect(() => serializeRepo({
+                    repoRoot: tmpDir.name,
+                    outputDir: outputDir.name,
+                    maxFileSize: MIN_FILE_SIZE - 1
+                })).toThrow(`Max file size must be between`);
+
+                expect(() => serializeRepo({
+                    repoRoot: tmpDir.name,
+                    outputDir: outputDir.name,
+                    maxFileSize: MAX_FILE_SIZE + 1
+                })).toThrow(`Max file size must be between`);
+            });
         });
     });
 });
