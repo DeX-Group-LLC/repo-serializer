@@ -166,6 +166,60 @@ describe('repo-serializer', () => {
             expect(content).toContain('test content');
         });
 
+        test('handles output files inside repository root', () => {
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            fs.mkdirSync(repoDir);
+
+            // Create test content and output files inside repo root
+            fs.writeFileSync(path.join(repoDir, 'test.txt'), 'test content');
+            fs.writeFileSync(path.join(repoDir, 'structure.txt'), 'old structure');
+            fs.writeFileSync(path.join(repoDir, 'content.txt'), 'old content');
+
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir: repoDir,  // Output to repo root
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt',
+                force: true
+            });
+
+            const structure = fs.readFileSync(path.join(repoDir, 'structure.txt'), 'utf-8');
+            const content = fs.readFileSync(path.join(repoDir, 'content.txt'), 'utf-8');
+            expect(structure).toContain('test.txt');
+            expect(content).toContain('test content');
+            // Output files should not be included in their own output
+            expect(content).not.toContain('old structure');
+            expect(content).not.toContain('old content');
+        });
+
+        test('handles output files outside repository root', () => {
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(repoDir);
+            fs.mkdirSync(outputDir);
+
+            // Create test content and output files outside repo root
+            fs.writeFileSync(path.join(repoDir, 'test.txt'), 'test content');
+            fs.writeFileSync(path.join(outputDir, 'structure.txt'), 'old structure');
+            fs.writeFileSync(path.join(outputDir, 'content.txt'), 'old content');
+
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir: outputDir,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt',
+                force: true
+            });
+
+            const structure = fs.readFileSync(path.join(outputDir, 'structure.txt'), 'utf-8');
+            const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+            // Should include all repo files since output is outside
+            expect(structure).toContain('test.txt');
+            expect(content).toContain('test content');
+        });
+
         test('succeeds when no files exist with force=true', () => {
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
             const repoDir = path.join(tmpDir, 'test-repo');

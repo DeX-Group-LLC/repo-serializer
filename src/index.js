@@ -242,8 +242,6 @@ function serializeRepo(options) {
         }
     }
 
-    console.log(additionalIgnorePatterns);
-
     // Create initial ignore instance with default patterns
     const ig = createInitialIgnore(additionalIgnorePatterns);
 
