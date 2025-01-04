@@ -316,7 +316,6 @@ function serializeRepo(options) {
         ignoreDefaultPatterns = false,
         noGitignore = false
     } = options;
-    console.log(options);
 
     // Validate maxFileSize
     if (maxFileSize < MIN_FILE_SIZE || maxFileSize > MAX_FILE_SIZE) {
