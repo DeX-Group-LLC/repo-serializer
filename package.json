@@ -1,6 +1,6 @@
 {
   "name": "repo-serializer",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "A tool to serialize a repository's structure and contents into readable text files",
   "main": "src/index.js",
   "bin": {
