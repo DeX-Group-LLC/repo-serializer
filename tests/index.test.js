@@ -1,4 +1,4 @@
-const { serializeRepo, DEFAULT_IGNORE_PATTERNS } = require('../src/index');
+const { serializeRepo, ALWAYS_IGNORE_PATTERNS, DEFAULT_IGNORE_PATTERNS } = require('../src/index');
 const fs = require('fs');
 const path = require('path');
 const tmp = require('tmp');
@@ -103,8 +103,13 @@ describe('repo-serializer', () => {
             expect(structure).not.toContain('custom.skip');
         });
 
+        test('ALWAYS_IGNORE_PATTERNS contains expected patterns', () => {
+            expect(ALWAYS_IGNORE_PATTERNS).toContain('.git/');
+        });
+
         test('DEFAULT_IGNORE_PATTERNS contains expected patterns', () => {
-            expect(DEFAULT_IGNORE_PATTERNS).toContain('.git/');
+            expect(DEFAULT_IGNORE_PATTERNS).toContain('.*');
+            expect(DEFAULT_IGNORE_PATTERNS).toContain('.*/');
             expect(DEFAULT_IGNORE_PATTERNS).toContain('package-lock.json');
         });
     });
