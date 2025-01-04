@@ -1004,28 +1004,90 @@ describe('repo-serializer', () => {
              * - Size limit overrides
              */
 
-            test('handles large files', () => {
+            test('handles non-text files with silent option', () => {
                 /**
-                 * Ensures that files exceeding size limits
-                 * are properly excluded from content
+                 * Verifies that non-text files are handled correctly
+                 * with both silent=true and silent=false
                  */
 
                 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
-                const largeFile = path.join(tmpDir, 'large.txt');
+                const repoDir = path.join(tmpDir, 'test-repo');
+                const outputDir = path.join(tmpDir, 'output');
+                fs.mkdirSync(repoDir);
+                fs.mkdirSync(outputDir);
 
-                // Create a file larger than 8KB (default max size)
-                const largeContent = Buffer.alloc(8193).fill('x');
+                // Create a binary file
+                const binaryFile = path.join(repoDir, 'test.bin');
+                const buffer = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+                fs.writeFileSync(binaryFile, buffer);
+
+                // Mock console.log to track calls
+                const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation();
+
+                // Test with silent=false (default)
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
+                    structureFile: 'structure1.txt',
+                    contentFile: 'content1.txt'
+                });
+
+                // Verify the non-text file message was logged
+                const nonTextCalls = mockConsoleLog.mock.calls.filter(call =>
+                    call[0].includes('Skipping non-text file from content file: test.bin')
+                );
+                expect(nonTextCalls.length).toBe(1);
+
+                // Reset mock
+                mockConsoleLog.mockClear();
+
+                // Test with silent=true
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
+                    structureFile: 'structure2.txt',
+                    contentFile: 'content2.txt',
+                    silent: true
+                });
+
+                // Verify no non-text file messages were logged
+                const silentNonTextCalls = mockConsoleLog.mock.calls.filter(call =>
+                    call[0].includes('Skipping non-text file from content file:')
+                );
+                expect(silentNonTextCalls.length).toBe(0);
+
+                // Restore console.log
+                mockConsoleLog.mockRestore();
+            });
+
+            test('handles large files', () => {
+                /**
+                 * Ensures that large files are included in the output
+                 * while still being checked for human-readability up
+                 * to the maxFileSize limit
+                 */
+
+                const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+                const repoDir = path.join(tmpDir, 'test-repo');
+                const outputDir = path.join(tmpDir, 'output');
+                fs.mkdirSync(repoDir);
+                fs.mkdirSync(outputDir);
+
+                // Create a file larger than 8KB (default max size) with text content
+                const largeFile = path.join(repoDir, 'large.txt');
+                const largeContent = Buffer.alloc(8194 * 16).fill('x');
                 fs.writeFileSync(largeFile, largeContent);
 
                 serializeRepo({
-                    repoRoot: tmpDir,
-                    outputDir: tmpDir,
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
                     structureFile: 'structure.txt',
                     contentFile: 'content.txt'
                 });
 
-                const content = fs.readFileSync(path.join(tmpDir, 'content.txt'), 'utf-8');
-                expect(content).not.toContain('FILE: large.txt');
+                const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+                expect(content).toContain('FILE: large.txt');
+                expect(content).toContain('x'.repeat(8194 * 16));
             });
 
             test('validates maxFileSize limits', () => {
@@ -1034,15 +1096,21 @@ describe('repo-serializer', () => {
                  * validated against min/max constraints
                  */
 
+                const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+                const repoDir = path.join(testDir, 'test-repo');
+                const outputDir = path.join(testDir, 'output');
+                fs.mkdirSync(repoDir);
+                fs.mkdirSync(outputDir);
+
                 expect(() => serializeRepo({
-                    repoRoot: tmpDir.name,
-                    outputDir: outputDir.name,
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
                     maxFileSize: MIN_FILE_SIZE - 1
                 })).toThrow(`Max file size must be between`);
 
                 expect(() => serializeRepo({
-                    repoRoot: tmpDir.name,
-                    outputDir: outputDir.name,
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
                     maxFileSize: MAX_FILE_SIZE + 1
                 })).toThrow(`Max file size must be between`);
             });

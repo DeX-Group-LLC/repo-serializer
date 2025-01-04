@@ -90,6 +90,7 @@ Options:
 
   # Behavior Options
   -f, --force                     Overwrite existing files without prompting (default: false)
+  -q, --quiet                     Suppress console output (default: false)
 
   # Information Options
   -v, --version                   Display the version number
@@ -108,6 +109,9 @@ Examples:
   # Force overwrite without prompting
   repo-serialize -f
 
+  # Run quietly (suppress console output)
+  repo-serialize -q
+
   # Complete example with all option types
   repo-serialize --dir ./project \
                  --output ./analysis \
@@ -117,7 +121,8 @@ Examples:
                  --all \
                  --no-gitignore \
                  --ignore "*.log" "temp/" \
-                 --force
+                 --force \
+                 --quiet
 
   # LLM-optimized snapshot (using 4MB limit)
   repo-serialize -m 4MB -a -o ./llm-analysis
@@ -142,6 +147,7 @@ const options = {
     ignoreDefaultPatterns: false,     // Set to true to disable default ignore patterns
     noGitignore: false,              // Set to true to disable .gitignore processing
     force: false,                    // Set to true to overwrite existing files
+    silent: false,                   // Set to true to suppress console output
 
     // Optional callbacks
     onProgress: (processedFiles, totalFiles) => {
