@@ -148,7 +148,6 @@ function generateStructure(dir, parentGitignorePatterns, repoRoot, prefix = '') 
     // Filter and sort entries
     const validEntries = entries
         .filter(entry => !shouldIgnore(path.join(dir, entry.name), gitignorePatterns, repoRoot))
-        .filter(entry => entry.isDirectory() || isTextFile(path.join(dir, entry.name)))
         .sort((a, b) => {
             // Directories come first, then sort alphabetically
             if (a.isDirectory() && !b.isDirectory()) return -1;
