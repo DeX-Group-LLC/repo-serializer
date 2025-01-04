@@ -30,6 +30,7 @@ jobs:
       run: npm test
 
     - name: Upload coverage to Coveralls
+      if: github.event_name == 'pull_request' && matrix.node-version == '22.x' && matrix.os == 'ubuntu-latest'
       uses: coverallsapp/github-action@v2
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
