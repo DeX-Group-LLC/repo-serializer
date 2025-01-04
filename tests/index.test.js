@@ -1004,6 +1004,62 @@ describe('repo-serializer', () => {
              * - Size limit overrides
              */
 
+            test('handles non-text files with silent option', () => {
+                /**
+                 * Verifies that non-text files are handled correctly
+                 * with both silent=true and silent=false
+                 */
+
+                const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+                const repoDir = path.join(tmpDir, 'test-repo');
+                const outputDir = path.join(tmpDir, 'output');
+                fs.mkdirSync(repoDir);
+                fs.mkdirSync(outputDir);
+
+                // Create a binary file
+                const binaryFile = path.join(repoDir, 'test.bin');
+                const buffer = Buffer.from([0x00, 0x01, 0x02, 0x03]);
+                fs.writeFileSync(binaryFile, buffer);
+
+                // Mock console.log to track calls
+                const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation();
+
+                // Test with silent=false (default)
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
+                    structureFile: 'structure1.txt',
+                    contentFile: 'content1.txt'
+                });
+
+                // Verify the non-text file message was logged
+                const nonTextCalls = mockConsoleLog.mock.calls.filter(call =>
+                    call[0].includes('Skipping non-text file from content file: test.bin')
+                );
+                expect(nonTextCalls.length).toBe(1);
+
+                // Reset mock
+                mockConsoleLog.mockClear();
+
+                // Test with silent=true
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir: outputDir,
+                    structureFile: 'structure2.txt',
+                    contentFile: 'content2.txt',
+                    silent: true
+                });
+
+                // Verify no non-text file messages were logged
+                const silentNonTextCalls = mockConsoleLog.mock.calls.filter(call =>
+                    call[0].includes('Skipping non-text file from content file:')
+                );
+                expect(silentNonTextCalls.length).toBe(0);
+
+                // Restore console.log
+                mockConsoleLog.mockRestore();
+            });
+
             test('handles large files', () => {
                 /**
                  * Ensures that large files are included in the output
