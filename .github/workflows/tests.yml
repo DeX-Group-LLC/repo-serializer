@@ -2,6 +2,8 @@ name: Tests
 
 on:
   push:
+    branches-ignore:
+      - 'refs/pull/**'
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -10,8 +12,6 @@ permissions:
 
 jobs:
   test:
-    # Skip push events on PR branches
-    if: github.event_name != 'push' || github.event.pull_request == null
     name: Test on node ${{ matrix.node-version }} and ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
