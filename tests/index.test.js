@@ -168,12 +168,7 @@ describe('repo-serializer', () => {
     });
 
     test('serializeRepo handles file read errors', () => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
-        const repoDir = path.join(tmpDir, 'test-repo');
-        fs.mkdirSync(repoDir);
-
-        // Create a test file
-        const testFile = path.join(repoDir, 'error.txt');
+        const testFile = path.join(tmpDir.name, 'error.txt');
         fs.writeFileSync(testFile, 'test content');
 
         // Mock fs.openSync to throw an error
@@ -188,13 +183,11 @@ describe('repo-serializer', () => {
         // Spy on console.error
         const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-        const outputDir = path.join(tmpDir, 'output');
-
         // Execute and expect no throw
         expect(() => {
             serializeRepo({
-                repoRoot: repoDir,
-                outputDir,
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
                 structureFile: 'structure.txt',
                 contentFile: 'content.txt'
             });
@@ -209,29 +202,23 @@ describe('repo-serializer', () => {
         fs.openSync = originalOpenSync;
         consoleErrorSpy.mockRestore();
 
-        const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+        const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
         expect(content).not.toContain('error.txt'); // File with read error should not be included in content
     });
 
     test('serializeRepo handles empty files', () => {
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
-        const repoDir = path.join(tmpDir, 'test-repo');
-        fs.mkdirSync(repoDir);
-
-        // Create an empty file
-        const emptyFile = path.join(repoDir, 'empty.txt');
+        const emptyFile = path.join(tmpDir.name, 'empty.txt');
         fs.writeFileSync(emptyFile, '');
 
-        const outputDir = path.join(tmpDir, 'output');
         serializeRepo({
-            repoRoot: repoDir,
-            outputDir,
+            repoRoot: tmpDir.name,
+            outputDir: outputDir.name,
             structureFile: 'structure.txt',
             contentFile: 'content.txt'
         });
 
         // Verify empty file is included in content
-        const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+        const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
         expect(content).toContain('empty.txt');
         expect(content).toContain('FILE: empty.txt');
         expect(content).toContain('END FILE: empty.txt');
