@@ -102,9 +102,6 @@ function prettyFileSize(size) {
 function isTextFile(filePath, maxFileSize) {
     try {
         const stats = fs.statSync(filePath);
-        if (stats.size > maxFileSize) {
-            return false;
-        }
 
         // Try to read the first chunk of the file to determine if it's text
         const fd = fs.openSync(filePath, 'r');
@@ -242,9 +239,10 @@ function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, 
  * @param {string[]} additionalPatterns - Additional patterns to ignore.
  * @param {number} maxFileSize - Maximum file size in bytes
  * @param {boolean} processGitignore - Whether to process .gitignore files
+ * @param {boolean} silent - Whether to suppress console output
  * @returns {string} - The file contents.
  */
-function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore) {
+function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent) {
     let contentFile = '';
     const entries = fs.readdirSync(dir);
 
@@ -273,7 +271,7 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
         }
 
         if (stats.isDirectory()) {
-            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore);
+            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent);
         } else if (isTextFile(fullPath, maxFileSize)) {
             contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
             contentFile += `FILE: ${relativePath}\n`;
@@ -283,6 +281,8 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
             contentFile += '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n';
             contentFile += `END FILE: ${relativePath}\n`;
             contentFile += '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n';
+        } else if (!silent) {
+            console.log(`Skipping non-text file from content file: ${relativePath}`);
         }
     }
 
@@ -302,6 +302,7 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
  * @param {number} [options.maxFileSize=8192] - Maximum file size in bytes to process (512B-4MB).
  * @param {boolean} [options.ignoreDefaultPatterns=false] - Ignore default ignore patterns.
  * @param {boolean} [options.processGitignore=true] - Whether to process .gitignore files.
+ * @param {boolean} [options.silent=false] - Whether to suppress console output.
  */
 function serializeRepo(options) {
     const {
@@ -314,7 +315,8 @@ function serializeRepo(options) {
         isCliCall = false,
         maxFileSize = DEFAULT_MAX_FILE_SIZE,
         ignoreDefaultPatterns = false,
-        noGitignore = false
+        noGitignore = false,
+        silent = false
     } = options;
 
     // Validate maxFileSize
@@ -361,7 +363,7 @@ function serializeRepo(options) {
     }
 
     const structure = generateStructure(repoRoot, ig, repoRoot, '', additionalIgnorePatterns, !noGitignore);
-    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore);
+    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent);
 
     // Ensure output directory exists
     fs.mkdirSync(outputDir, { recursive: true });
