@@ -1,9 +1,10 @@
 name: Tests
 
-on: [push]
+on: [push, pull_request]
 
 permissions:
   contents: read
+  pull-requests: write  # Required for coverage comments
 
 jobs:
   test:
@@ -32,3 +33,16 @@ jobs:
       uses: coverallsapp/github-action@v2
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
+        flag-name: run ${{ join(matrix.*, ' - ') }}
+        parallel: true
+
+  finish:
+    name: Coveralls Finished
+    needs: test
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Coveralls Finished
+      uses: coverallsapp/github-action@v2
+      with:
+        parallel-finished: true

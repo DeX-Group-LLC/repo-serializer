@@ -329,9 +329,20 @@ function serializeRepo(options) {
 
     if (fs.existsSync(structurePath) || fs.existsSync(contentPath)) {
         if (force) {
+            const normalizedStructurePath = path.resolve(structurePath);
+            const normalizedContentPath = path.resolve(contentPath);
+            const normalizedRepoRoot = path.resolve(repoRoot);
             // Delete existing files when force is true
-            if (fs.existsSync(structurePath)) fs.unlinkSync(structurePath);
-            if (fs.existsSync(contentPath)) fs.unlinkSync(contentPath);
+            if (fs.existsSync(structurePath) && normalizedStructurePath.startsWith(normalizedRepoRoot)) {
+                // Only add to ignore if the file is within the repo root
+                const relativeStructurePath = path.relative(repoRoot, structurePath).replace(/\\/g, '/');
+                additionalIgnorePatterns.push('/' + relativeStructurePath);
+            }
+            if (fs.existsSync(contentPath) && normalizedContentPath.startsWith(normalizedRepoRoot)) {
+                // Only add to ignore if the file is within the repo root
+                const relativeContentPath = path.relative(repoRoot, contentPath).replace(/\\/g, '/');
+                additionalIgnorePatterns.push('/' + relativeContentPath);
+            }
         } else if (isCliCall) {
             throw new Error('PROMPT_REQUIRED');
         } else {
