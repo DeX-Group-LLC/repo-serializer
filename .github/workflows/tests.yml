@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   pull-requests: write  # Required for coverage comments
+  actions: write        # Required to cancel workflow runs
 
 jobs:
   check-and-throttle-schedule:
