@@ -12,7 +12,8 @@ permissions:
   pull-requests: write  # Required for coverage comments
 
 jobs:
-  check-last-run:
+  check-and-throttle-schedule:
+    name: Check and throttle schedule
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -63,8 +64,8 @@ jobs:
 
   test:
     name: Test on node ${{ matrix.node-version }} and ${{ matrix.os }}
-    needs: check-last-run
-    if: ${{ always() && (needs.check-last-run.result == 'success' || needs.check-last-run.result == 'skipped') }}
+    needs: check-and-throttle-schedule
+    if: ${{ always() && (needs.check-and-throttle-schedule.result == 'success' || needs.check-and-throttle-schedule.result == 'skipped') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
