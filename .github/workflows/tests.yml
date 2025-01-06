@@ -64,6 +64,7 @@ jobs:
   test:
     name: Test on node ${{ matrix.node-version }} and ${{ matrix.os }}
     needs: check-last-run
+    if: ${{ always() && (needs.check-last-run.result == 'success' || needs.check-last-run.result == 'skipped') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
