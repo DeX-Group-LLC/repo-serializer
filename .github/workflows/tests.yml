@@ -15,7 +15,7 @@ permissions:
 jobs:
   check-and-throttle-schedule:
     name: Check and throttle schedule
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
       - name: Check workflow history
