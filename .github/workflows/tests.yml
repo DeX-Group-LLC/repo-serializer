@@ -22,11 +22,10 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const { workflow } = context;
             const runs = await github.rest.actions.listWorkflowRuns({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: workflow.id,
+              workflow_id: context.workflow,
               per_page: 100
             });
 
