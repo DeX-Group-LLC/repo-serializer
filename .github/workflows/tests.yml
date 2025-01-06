@@ -96,7 +96,7 @@ jobs:
   finish:
     name: Coveralls Finished
     needs: test
-    if: ${{ always() }}
+    if: ${{ always() && needs.test.result != 'skipped' && needs.test.result != 'cancelled' }}
     runs-on: ubuntu-latest
     steps:
     - name: Coveralls Finished
