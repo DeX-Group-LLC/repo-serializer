@@ -1,12 +1,10 @@
 # repo-serializer
-[![Build Status](https://github.com/DeX-Group-LLC/repo-serializer/actions/workflows/tests.yml/badge.svg)](https://github.com/DeX-Group-LLC/repo-serializer/actions/workflows/tests.yml)
-[![Coverage Status](https://coveralls.io/repos/github/DeX-Group-LLC/repo-serializer/badge.svg?branch=main)](https://coveralls.io/github/DeX-Group-LLC/repo-serializer?branch=main)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-[![Node Version](https://img.shields.io/badge/node-%3E%3D18.x-brightgreen)](https://nodejs.org)
-[![NPM Version](https://badge.fury.io/js/repo-serializer.svg)](https://badge.fury.io/js/repo-serializer)
-
-[![Dependencies](https://img.shields.io/librariesio/release/npm/repo-serializer)](https://libraries.io/npm/repo-serializer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=square)](https://opensource.org/licenses/MIT)
+[![Tests Status](https://github.com/DeX-Group-LLC/repo-serializer/actions/workflows/tests.yml/badge.svg?style=square)](https://github.com/DeX-Group-LLC/repo-serializer/actions/workflows/tests.yml)
+[![Coverage Status](https://coveralls.io/repos/github/DeX-Group-LLC/repo-serializer/badge.svg?branch=main&style=square)](https://coveralls.io/github/DeX-Group-LLC/repo-serializer?branch=main)
+[![Node Version](https://img.shields.io/badge/node-%3E%3D18.x-brightgreen?style=square)](https://nodejs.org)
+[![NPM Version](https://badge.fury.io/js/repo-serializer.svg?style=square)](https://badge.fury.io/js/repo-serializer)
+[![Dependencies](https://img.shields.io/librariesio/release/npm/repo-serializer?style=square)](https://libraries.io/npm/repo-serializer)
 [![Install Size](https://packagephobia.com/badge?p=repo-serializer)](https://packagephobia.com/result?p=repo-serializer)
 
 📄 A command-line tool that creates a human-readable snapshot of your codebase. It generates two files:
