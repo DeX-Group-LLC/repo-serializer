@@ -88,6 +88,7 @@ Options:
   -a, --all                       Disable default ignore patterns (default: false)
   -g, --no-gitignore              Disable .gitignore processing (enabled by default)
   -i, --ignore <patterns...>      Additional patterns to ignore
+  --hierarchical                  Use hierarchical (alphabetical) ordering for content file (default: false)
 
   # Behavior Options
   -f, --force                     Overwrite existing files without prompting (default: false)
@@ -100,6 +101,9 @@ Options:
 Examples:
   # Basic input/output usage
   repo-serialize -d ./my-project -o ./output
+
+  # Use hierarchical content ordering
+  repo-serialize --hierarchical
 
   # Disable default ignore patterns
   repo-serialize -a
@@ -149,6 +153,7 @@ const options = {
     noGitignore: false,              // Set to true to disable .gitignore processing
     force: false,                    // Set to true to overwrite existing files
     silent: false,                   // Set to true to suppress console output
+    hierarchicalContent: false,       // Set to true to use hierarchical (alphabetical) content ordering
 
     // Optional callbacks
     onProgress: (processedFiles, totalFiles) => {

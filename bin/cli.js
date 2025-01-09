@@ -66,6 +66,7 @@ program
     .option('-a, --all', 'Disable default ignore patterns (default: false)')
     .option('-g, --no-gitignore', 'Disable .gitignore processing (enabled by default)')
     .option('-i, --ignore <patterns...>', 'Additional patterns to ignore')
+    .option('--hierarchical', 'Use hierarchical (alphabetical) ordering for content file (default: false)')
 
     // Behavior Options
     .option('-f, --force', 'Overwrite existing files without prompting (default: false)')
@@ -88,7 +89,8 @@ program
                 maxFileSize: parseFileSize(options.maxFileSize),
                 ignoreDefaultPatterns: options.all,
                 noGitignore: !options.gitignore,  // Commander sets gitignore=false when --no-gitignore is used
-                silent: options.quiet
+                silent: options.quiet,
+                hierarchicalContent: options.hierarchical
             };
 
             try {
