@@ -96,10 +96,12 @@ Options:
 
   # Behavior Options
   -f, --force                     Overwrite existing files without prompting (default: false)
-  -q, --quiet                     Suppress console output (default: false)
+  --silent                        Suppress all console output (default: false)
+  --verbose                       Enable verbose logging of all processed and ignored files (default: false)
+                                 Note: Cannot be used with --silent
 
   # Information Options
-  -v, --version                   Display the version number
+  -V, --version                   Display the version number
   -h, --help                      Display help information
 
 Examples:
@@ -147,33 +149,35 @@ Examples:
 ```javascript
 const { serializeRepo } = require('repo-serializer');
 
-// All options shown with default values
-const options = {
-    // Required options
+// Basic usage with default options
+await serializeRepo({
     repoRoot: '/path/to/repo',
-    outputDir: '/path/to/output',
+    outputDir: '/path/to/output'
+});
 
-    // Optional configurations
-    structureFile: 'repo_structure.txt',
-    contentFile: 'repo_content.txt',
-    additionalIgnorePatterns: ['*.log', 'temp/'],
-    maxFileSize: 8192,                // 8KB, must be between 512B and 4MB
-    ignoreDefaultPatterns: false,     // Set to true to disable default ignore patterns
-    noGitignore: false,              // Set to true to disable .gitignore processing
-    force: false,                    // Set to true to overwrite existing files
-    silent: false                    // Set to true to suppress console output
-    hierarchicalContent: false,       // Set to true to use hierarchical (alphabetical) content ordering
+
+// Advanced usage with all options
+await serializeRepo({
+    // Input/Output options
+    repoRoot: '/path/to/repo',           // Directory to serialize
+    outputDir: '/path/to/output',        // Output directory
+    structureFile: 'structure.txt',      // Custom structure filename
+    contentFile: 'content.txt',          // Custom content filename
+
+    // Processing options
+    maxFileSize: 8192,                   // Max file size in bytes (512B-4MB)
+    ignoreDefaultPatterns: false,        // Set to true to disable default ignores
+    noGitignore: false,                  // Set to true to disable .gitignore processing
+    additionalIgnorePatterns: ['*.log'], // Additional patterns to ignore
+    hierarchicalContent: false,          // Set to true to use hierarchical (alphabetical) content ordering
     maxReplacementRatio: 0,           // 0 means no replacement characters allowed
     keepReplacementChars: false,      // false means strip replacement characters
-};
 
-// Async usage
-await serializeRepo(options);
-
-// Promise usage
-serializeRepo(options)
-    .then(() => console.log('Serialization complete'))
-    .catch(error => console.error('Error:', error));
+    // Behavior options
+    force: false,                        // Overwrite without prompting
+    silent: false,                       // Suppress all console output
+    verbose: false                       // Enable verbose logging (cannot be used with silent)
+});
 ```
 
 ## Output Format

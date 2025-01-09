@@ -524,6 +524,17 @@ describe('repo-serializer', () => {
          * - Output file management
          */
 
+        test('throws error when verbose and silent are used together', () => {
+            expect(() => {
+                serializeRepo({
+                    repoRoot: tmpDir.name,
+                    outputDir: outputDir.name,
+                    verbose: true,
+                    silent: true
+                });
+            }).toThrow('Cannot use verbose and silent options together');
+        });
+
         test('succeeds when no files exist', () => {
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
             const repoDir = path.join(tmpDir, 'test-repo');
@@ -1315,7 +1326,76 @@ describe('repo-serializer', () => {
         });
     });
 
-    // File size handling
+    describe('verbose logging', () => {
+        test('logs detailed information when verbose is enabled', async () => {
+            // Create a spy for console.log
+            const consoleSpy = jest.spyOn(console, 'log');
+
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                verbose: true,
+                additionalIgnorePatterns: ['*.tmp', 'temp/']
+            });
+
+            // Verify verbose logging calls
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Added default ignore patterns'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Added additional ignore patterns'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Added gitignore patterns from: .gitignore'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding directory: src/'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding file: src/file2.js'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ignoring: .gitignore'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding file: file1.txt'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ignoring: ignored.txt'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ignoring: test.log'));
+        });
+
+        test('logs detailed information for gitignore files in subfolders when verbose is enabled', () => {
+            // Create a spy for console.log
+            const consoleSpy = jest.spyOn(console, 'log');
+
+            // Create nested directories with their own .gitignore files
+            fs.mkdirSync(path.join(tmpDir.name, 'nested'));
+            fs.mkdirSync(path.join(tmpDir.name, 'nested', 'subdir'));
+
+            // Create .gitignore files at different levels
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', '.gitignore'), '*.secret\n');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'subdir', '.gitignore'), '*.private\n');
+
+            // Create mix of ignored and non-ignored files
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'test.secret'), 'secret content');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'keep.txt'), 'kept content');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'subdir', 'test.private'), 'private content');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'subdir', 'keep.txt'), 'kept content');
+
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                verbose: true
+            });
+
+            // Verify verbose logging for nested .gitignore files and their effects
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Added gitignore patterns from: .gitignore'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Added gitignore patterns from: nested/.gitignore'));
+
+            // Verify directory traversal logging
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding directory: nested/'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding directory: nested/subdir/'));
+
+            // Verify file handling logging
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding file: nested/keep.txt'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding file: nested/subdir/keep.txt'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ignoring: nested/test.secret'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ignoring: nested/subdir/test.private'));
+
+            // Verify the actual content to ensure ignored files are not included
+            const content = fs.readFileSync(path.join(outputDir.name, 'repo_content.txt'), 'utf-8');
+            expect(content).toContain('kept content');
+            expect(content).not.toContain('secret content');
+            expect(content).not.toContain('private content');
+        });
+    });
+
     describe('file size handling', () => {
         /**
          * Tests file size related functionality:
