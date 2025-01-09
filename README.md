@@ -194,15 +194,15 @@ repo/
 ```
 
 ### Content File
-Contains the contents of all text files, clearly marked with headers and footers:
+Contains the contents of all text files, clearly marked with separators:
 ```
->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-FILE: src/index.js
->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+============================================================
+START OF FILE: src/index.js
+------------------------------------------------------------
 [file contents here]
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-END FILE: src/index.js
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+------------------------------------------------------------
+END OF FILE: src/index.js
+============================================================
 ```
 
 ## Common Use Cases

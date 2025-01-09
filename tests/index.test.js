@@ -1005,8 +1005,8 @@ describe('repo-serializer', () => {
         // Verify empty file is included in content
         const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
         expect(content).toContain('empty.txt');
-        expect(content).toContain('FILE: empty.txt');
-        expect(content).toContain('END FILE: empty.txt');
+        expect(content).toContain('START OF FILE: empty.txt');
+        expect(content).toContain('END OF FILE: empty.txt');
     });
 
     // File handling edge cases
@@ -1232,8 +1232,8 @@ describe('repo-serializer', () => {
             // Verify empty file is included in content
             const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
             expect(content).toContain('empty.txt');
-            expect(content).toContain('FILE: empty.txt');
-            expect(content).toContain('END FILE: empty.txt');
+            expect(content).toContain('START OF FILE: empty.txt');
+            expect(content).toContain('END OF FILE: empty.txt');
         });
 
         test('handles control characters correctly', () => {

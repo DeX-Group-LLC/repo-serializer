@@ -2,6 +2,32 @@ const fs = require('fs');
 const path = require('path');
 const ignore = require('ignore');
 
+/** @constant {string} FILE_SEPARATOR - Separator line for file boundaries */
+const FILE_SEPARATOR = '='.repeat(60);
+
+/** @constant {string} CONTENT_SEPARATOR - Separator line for content sections */
+const CONTENT_SEPARATOR = '-'.repeat(60);
+
+/**
+ * Wraps content with file separators
+ * @param {string} relativePath - The relative path of the file
+ * @param {string} content - The content to wrap
+ * @returns {string} - The wrapped content with separators
+ */
+function wrapWithSeparators(relativePath, content) {
+    return [
+        '',  // First newline for visual separation between files
+        '',  // Second newline for visual separation between files
+        FILE_SEPARATOR,
+        `START OF FILE: ${relativePath}`,
+        CONTENT_SEPARATOR,
+        content,
+        CONTENT_SEPARATOR,
+        `END OF FILE: ${relativePath}`,
+        FILE_SEPARATOR,
+    ].join('\n');
+}
+
 /** @constant {number} DEFAULT_MAX_FILE_SIZE - Default maximum file size in bytes (8KB) */
 const DEFAULT_MAX_FILE_SIZE = 8192;
 
@@ -341,29 +367,24 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
             if (verbose) {
                 console.log(`Adding directory: ${relativePath}`);
             }
+            contentFile += '\n\n';
             contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical, maxReplacementRatio, keepReplacementChars);
         } else if (isTextFile(fullPath, maxFileSize, maxReplacementRatio)) {
             if (verbose) {
                 console.log(`Adding file: ${relativePath}`);
             }
-            contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
-            contentFile += `FILE: ${relativePath}\n`;
-            contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
-            let content = replaceControlCharacters(fs.readFileSync(fullPath, 'utf-8'));
-            if (!keepReplacementChars) {
-                content = stripReplacementCharacters(content);
-            }
-            contentFile += content;
-            contentFile += '\n';
-            contentFile += '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n';
-            contentFile += `END FILE: ${relativePath}\n`;
-            contentFile += '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n';
+            contentFile += wrapWithSeparators(
+                relativePath,
+                keepReplacementChars ?
+                    replaceControlCharacters(fs.readFileSync(fullPath, 'utf-8')) :
+                    stripReplacementCharacters(replaceControlCharacters(fs.readFileSync(fullPath, 'utf-8')))
+            );
         } else if (!silent) {
             console.log(`Skipping non-text file from content file: ${relativePath}`);
         }
     }
 
-    return contentFile;
+    return contentFile.trimStart();
 }
 
 /**
