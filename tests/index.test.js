@@ -803,6 +803,7 @@ describe('repo-serializer', () => {
          * - Empty files
          * - Permission errors
          * - Size limits
+         * - Replacement character ratios
          */
 
         test('handles binary files', () => {
@@ -831,6 +832,126 @@ describe('repo-serializer', () => {
 
             const content = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
             expect(content).not.toContain('test.bin'); // Binary file should not be included in content
+        });
+
+        test('accepts text with replacement characters when using higher ratio', () => {
+            /**
+             * Verifies that text files with replacement characters are accepted
+             * when using a higher maxReplacementRatio
+             */
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            fs.mkdirSync(repoDir);
+
+            // Create a text file with 20% replacement characters
+            const testFile = path.join(repoDir, 'test.txt');
+            const content = 'Hello\uFFFDWorld\uFFFD'; // 2 replacement chars in 10 chars = 20%
+            fs.writeFileSync(testFile, content);
+
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(outputDir);
+
+            // Should be rejected with default ratio (0)
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure1.txt',
+                contentFile: 'content1.txt'
+            });
+
+            const content1 = fs.readFileSync(path.join(outputDir, 'content1.txt'), 'utf-8');
+            expect(content1).not.toContain('test.txt');
+
+            // Should be accepted with ratio of 0.3 (30%)
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure2.txt',
+                contentFile: 'content2.txt',
+                maxReplacementRatio: 0.3,
+                keepReplacementChars: true
+            });
+
+            const content2 = fs.readFileSync(path.join(outputDir, 'content2.txt'), 'utf-8');
+            expect(content2).toContain('test.txt');
+            expect(content2).toContain('Hello\uFFFDWorld\uFFFD');
+
+            // Should be accepted with ratio of 0.3 but strip replacement chars
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure3.txt',
+                contentFile: 'content3.txt',
+                maxReplacementRatio: 0.3,
+                keepReplacementChars: false
+            });
+
+            const content3 = fs.readFileSync(path.join(outputDir, 'content3.txt'), 'utf-8');
+            expect(content3).toContain('test.txt');
+            expect(content3).toContain('HelloWorld');
+            expect(content3).not.toContain('\uFFFD');
+        });
+
+        test('accepts text without replacement characters regardless of ratio', () => {
+            /**
+             * Verifies that text files without replacement characters are accepted
+             * regardless of the maxReplacementRatio value
+             */
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            fs.mkdirSync(repoDir);
+
+            // Create a text file with no replacement characters
+            const testFile = path.join(repoDir, 'test.txt');
+            const content = 'Hello World 123 ☺'; // Unicode but no replacement chars
+            fs.writeFileSync(testFile, content);
+
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(outputDir);
+
+            // Should be accepted with any ratio
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt',
+                maxReplacementRatio: 0.5 // Any value should work
+            });
+
+            const fileContent = fs.readFileSync(path.join(outputDir, 'content.txt'), 'utf-8');
+            expect(fileContent).toContain('test.txt');
+            expect(fileContent).toContain(content);
+        });
+
+        test('throws error for invalid maxReplacementRatio', () => {
+            /**
+             * Verifies that an error is thrown when maxReplacementRatio
+             * is not between 0 and 1
+             */
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            fs.mkdirSync(repoDir);
+
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(outputDir);
+
+            // Test negative ratio
+            expect(() => {
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir,
+                    maxReplacementRatio: -0.1
+                });
+            }).toThrow('Max replacement ratio must be between 0 and 1');
+
+            // Test ratio > 1
+            expect(() => {
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir,
+                    maxReplacementRatio: 1.5
+                });
+            }).toThrow('Max replacement ratio must be between 0 and 1');
         });
 
         test('handles file read errors', () => {
@@ -899,6 +1020,95 @@ describe('repo-serializer', () => {
             expect(content).toContain('empty.txt');
             expect(content).toContain('FILE: empty.txt');
             expect(content).toContain('END FILE: empty.txt');
+        });
+
+        test('handles control characters correctly', () => {
+            /**
+             * Verifies that control characters are properly replaced with U+FFFD
+             * and then either kept or stripped based on keepReplacementChars
+             */
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            fs.mkdirSync(repoDir);
+
+            // Create a text file with control characters
+            const testFile = path.join(repoDir, 'test.txt');
+            const content = 'Hello\u0000World\u0001'; // NUL and SOH control chars
+            fs.writeFileSync(testFile, content);
+
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(outputDir);
+
+            // Should be rejected with default ratio (0)
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure1.txt',
+                contentFile: 'content1.txt'
+            });
+
+            const content1 = fs.readFileSync(path.join(outputDir, 'content1.txt'), 'utf-8');
+            expect(content1).not.toContain('test.txt');
+
+            // Should be accepted with ratio of 0.3 and keep replacement chars
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure2.txt',
+                contentFile: 'content2.txt',
+                maxReplacementRatio: 0.3,
+                keepReplacementChars: true
+            });
+
+            const content2 = fs.readFileSync(path.join(outputDir, 'content2.txt'), 'utf-8');
+            expect(content2).toContain('test.txt');
+            expect(content2).toContain('Hello\uFFFDWorld\uFFFD'); // Control chars replaced with U+FFFD
+
+            // Should be accepted with ratio of 0.3 but strip replacement chars
+            serializeRepo({
+                repoRoot: repoDir,
+                outputDir,
+                structureFile: 'structure3.txt',
+                contentFile: 'content3.txt',
+                maxReplacementRatio: 0.3,
+                keepReplacementChars: false
+            });
+
+            const content3 = fs.readFileSync(path.join(outputDir, 'content3.txt'), 'utf-8');
+            expect(content3).toContain('test.txt');
+            expect(content3).toContain('HelloWorld'); // Control chars stripped
+            expect(content3).not.toContain('\uFFFD');
+        });
+
+        test('throws error for invalid maxReplacementRatio', () => {
+            /**
+             * Verifies that an error is thrown when maxReplacementRatio
+             * is not between 0 and 1
+             */
+            const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
+            const repoDir = path.join(tmpDir, 'test-repo');
+            fs.mkdirSync(repoDir);
+
+            const outputDir = path.join(tmpDir, 'output');
+            fs.mkdirSync(outputDir);
+
+            // Test negative ratio
+            expect(() => {
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir,
+                    maxReplacementRatio: -0.1
+                });
+            }).toThrow('Max replacement ratio must be between 0 and 1');
+
+            // Test ratio > 1
+            expect(() => {
+                serializeRepo({
+                    repoRoot: repoDir,
+                    outputDir,
+                    maxReplacementRatio: 1.5
+                });
+            }).toThrow('Max replacement ratio must be between 0 and 1');
         });
     });
 

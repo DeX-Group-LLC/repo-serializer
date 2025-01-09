@@ -32,7 +32,9 @@ Perfect for code reviews, documentation, archiving, or sharing code snippets wit
 ## Features
 
 - Respects `.gitignore` files (including nested ones)
-- Intelligently detects text files
+- Intelligently detects text files with UTF-8 encoding
+- Configurable text file detection sensitivity
+- Optional handling of replacement characters
 - Excludes binary files automatically
 - Customizable ignore patterns
 - Pretty-printed directory structure
@@ -85,6 +87,8 @@ Options:
   # Processing Options
   -m, --max-file-size <size>      Maximum file size to process (512B-4MB). Accepts units: B, KB, MB
                                   Examples: "512B", "1KB", "4MB" (default: 8KB)
+  -r, --max-replacement-ratio <ratio> Maximum ratio of replacement characters allowed (0-1, default: 0)
+  --keep-replacement-chars        Keep replacement characters in output (default: false)
   -a, --all                       Disable default ignore patterns (default: false)
   -g, --no-gitignore              Disable .gitignore processing (enabled by default)
   -i, --ignore <patterns...>      Additional patterns to ignore
@@ -107,6 +111,9 @@ Examples:
   # Processing configuration with file size in KB
   repo-serialize -m 1KB -a --no-gitignore -i "*.log" "temp/"
 
+  # Text file detection configuration
+  repo-serialize --max-replacement-ratio 0.1 --keep-replacement-chars
+
   # Force overwrite without prompting
   repo-serialize -f
 
@@ -119,6 +126,8 @@ Examples:
                  --structure-file tree.txt \
                  --content-file source.txt \
                  --max-file-size 1MB \
+                 --max-replacement-ratio 0.1 \
+                 --keep-replacement-chars \
                  --all \
                  --no-gitignore \
                  --ignore "*.log" "temp/" \
@@ -145,18 +154,12 @@ const options = {
     contentFile: 'repo_content.txt',
     additionalIgnorePatterns: ['*.log', 'temp/'],
     maxFileSize: 8192,                // 8KB, must be between 512B and 4MB
+    maxReplacementRatio: 0,           // 0 means no replacement characters allowed
+    keepReplacementChars: false,      // false means strip replacement characters
     ignoreDefaultPatterns: false,     // Set to true to disable default ignore patterns
     noGitignore: false,              // Set to true to disable .gitignore processing
     force: false,                    // Set to true to overwrite existing files
-    silent: false,                   // Set to true to suppress console output
-
-    // Optional callbacks
-    onProgress: (processedFiles, totalFiles) => {
-        console.log(`Processed ${processedFiles}/${totalFiles} files`);
-    },
-    onFileProcessed: (filePath, success) => {
-        console.log(`Processed: ${filePath}`);
-    }
+    silent: false                    // Set to true to suppress console output
 };
 
 // Async usage
@@ -258,3 +261,36 @@ If you encounter any problems or have suggestions, please [open an issue](https:
 ## License
 
 MIT
+
+## Text File Detection
+
+The tool uses UTF-8 encoding detection with configurable sensitivity to identify text files:
+
+### Replacement Character Handling
+
+When processing files, the tool may encounter invalid UTF-8 sequences which are replaced with the Unicode replacement character (U+FFFD). You can control this behavior with two options:
+
+1. `--max-replacement-ratio <ratio>` (default: 0)
+   - 0: Strictest setting, rejects files with any replacement characters
+   - 0.1: Allows up to 10% replacement characters
+   - 1: Most lenient, accepts any amount of replacement characters
+
+2. `--keep-replacement-chars` (default: false)
+   - When false: Strips replacement characters from output
+   - When true: Keeps replacement characters in output
+
+### Examples
+
+```bash
+# Strict text detection (default)
+repo-serialize
+
+# Allow up to 10% invalid characters but strip them from output
+repo-serialize --max-replacement-ratio 0.1
+
+# Allow up to 25% invalid characters and keep them in output
+repo-serialize --max-replacement-ratio 0.25 --keep-replacement-chars
+
+# Most lenient: accept any text-like file and keep all characters
+repo-serialize --max-replacement-ratio 1 --keep-replacement-chars
+```

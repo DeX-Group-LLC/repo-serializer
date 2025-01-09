@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const readline = require('readline');
 const { version } = require('../package.json');
-const { ALWAYS_IGNORE_PATTERNS, DEFAULT_IGNORE_PATTERNS, DEFAULT_MAX_FILE_SIZE, MIN_FILE_SIZE, MAX_FILE_SIZE, parseFileSize, prettyFileSize, serializeRepo } = require('../src/index');
+const { ALWAYS_IGNORE_PATTERNS, DEFAULT_IGNORE_PATTERNS, DEFAULT_MAX_FILE_SIZE, DEFAULT_REPLACEMENT_RATIO, MIN_FILE_SIZE, MAX_FILE_SIZE, parseFileSize, prettyFileSize, serializeRepo } = require('../src/index');
 
 // Setup readline interface for prompts
 const rl = readline.createInterface({
@@ -66,6 +66,8 @@ program
     .option('-a, --all', 'Disable default ignore patterns (default: false)')
     .option('-g, --no-gitignore', 'Disable .gitignore processing (enabled by default)')
     .option('-i, --ignore <patterns...>', 'Additional patterns to ignore')
+    .option('-r, --max-replacement-ratio <ratio>', `Maximum ratio of replacement characters allowed (0-1, default: ${DEFAULT_REPLACEMENT_RATIO})`, DEFAULT_REPLACEMENT_RATIO)
+    .option('--keep-replacement-chars', 'Keep replacement characters in output (default: false)')
 
     // Behavior Options
     .option('-f, --force', 'Overwrite existing files without prompting (default: false)')
@@ -88,8 +90,15 @@ program
                 maxFileSize: parseFileSize(options.maxFileSize),
                 ignoreDefaultPatterns: options.all,
                 noGitignore: !options.gitignore,  // Commander sets gitignore=false when --no-gitignore is used
-                silent: options.quiet
+                silent: options.quiet,
+                maxReplacementRatio: parseFloat(options.maxReplacementRatio),
+                keepReplacementChars: options.keepReplacementChars || false
             };
+
+            // Validate maxReplacementRatio
+            if (isNaN(config.maxReplacementRatio) || config.maxReplacementRatio < 0 || config.maxReplacementRatio > 1) {
+                throw new Error('Max replacement ratio must be a number between 0 and 1');
+            }
 
             try {
                 await serializeRepo(config);
