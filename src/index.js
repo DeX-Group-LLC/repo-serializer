@@ -24,6 +24,8 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
  * @property {number} [maxFileSize] - Maximum file size in bytes to process (512B-4MB, default: 8KB)
  * @property {boolean} [ignoreDefaultPatterns] - Whether to disable default ignore patterns (default: false)
  * @property {boolean} [noGitignore] - Whether to disable .gitignore processing (default: false)
+ * @property {boolean} [silent] - Whether to suppress console output (default: false)
+ * @property {boolean} [verbose] - Whether to enable verbose logging of all processed and ignored files (default: false)
  * @property {boolean} [hierarchicalContent] - Whether to serialize content in hierarchical order (default: false)
  */
 
@@ -150,20 +152,23 @@ function readGitignorePatterns(dir) {
  * Creates initial ignore instance with default patterns
  *
  * @param {string[]} additionalPatterns - Additional patterns to add
- * @param {boolean} [ignoreDefaultPatterns=false] - Whether to skip adding default ignore patterns
+ * @param {boolean} [ignoreDefaultPatterns] - Whether to skip adding default ignore patterns
+ * @param {boolean} [verbose] - Whether to enable verbose logging
  * @returns {Object} - Ignore instance with configured patterns
  */
-function createInitialIgnore(additionalPatterns, ignoreDefaultPatterns) {
+function createInitialIgnore(additionalPatterns, ignoreDefaultPatterns, verbose) {
     const ig = ignore();
     ig.add(ALWAYS_IGNORE_PATTERNS);
 
     // Add default patterns unless ignoreDefaultPatterns is true
     if (!ignoreDefaultPatterns) {
         ig.add(DEFAULT_IGNORE_PATTERNS);
+        if (verbose) console.log('Added default ignore patterns');
     }
 
     if (additionalPatterns.length > 0) {
         ig.add(additionalPatterns);
+        if (verbose) console.log('Added additional ignore patterns');
     }
     return ig;
 }
@@ -241,10 +246,11 @@ function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, 
  * @param {number} maxFileSize - Maximum file size in bytes
  * @param {boolean} processGitignore - Whether to process .gitignore files
  * @param {boolean} silent - Whether to suppress console output
+ * @param {boolean} verbose - Whether to enable verbose logging of all processed and ignored files
  * @param {boolean} hierarchical - Whether to use hierarchical ordering
  * @returns {string} - The file contents.
  */
-function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, hierarchical) {
+function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical) {
     let contentFile = '';
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -256,19 +262,14 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
         const dirPatterns = readGitignorePatterns(dir);
         if (dirPatterns.length > 0) {
             ig.add(dirPatterns);
+            if (verbose) {
+                console.log(`Added gitignore patterns from: ${path.relative(repoRoot, dir) != '' ? path.relative(repoRoot, dir) + '/' : ''}.gitignore`);
+            }
         }
     }
 
     // Filter and sort entries
     const validEntries = entries
-        .filter(entry => {
-            const fullPath = path.join(dir, entry.name);
-            let relativePath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
-            if (entry.isDirectory()) {
-                relativePath += '/';
-            }
-            return !ig.ignores(relativePath);
-        })
         .sort((a, b) => {
             if (!hierarchical) {
                 // For non-hierarchical mode, directories before files then alphabetical
@@ -284,8 +285,24 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
 
         if (entry.isDirectory()) {
             relativePath += '/';
-            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, hierarchical);
+        }
+
+        if (ig.ignores(relativePath)) {
+            if (verbose) {
+                console.log(`Ignoring: ${relativePath}`);
+            }
+            continue;
+        }
+
+        if (entry.isDirectory()) {
+            if (verbose) {
+                console.log(`Adding directory: ${relativePath}`);
+            }
+            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical);
         } else if (isTextFile(fullPath, maxFileSize)) {
+            if (verbose) {
+                console.log(`Adding file: ${relativePath}`);
+            }
             contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
             contentFile += `FILE: ${relativePath}\n`;
             contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
@@ -316,6 +333,7 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
  * @param {boolean} [options.ignoreDefaultPatterns=false] - Ignore default ignore patterns.
  * @param {boolean} [options.processGitignore=true] - Whether to process .gitignore files.
  * @param {boolean} [options.silent=false] - Whether to suppress console output.
+ * @param {boolean} [options.verbose=false] - Whether to enable verbose logging of all processed and ignored files.
  * @param {boolean} [options.hierarchicalContent=false] - Whether to serialize content in hierarchical order.
  */
 function serializeRepo(options) {
@@ -331,12 +349,18 @@ function serializeRepo(options) {
         ignoreDefaultPatterns = false,
         noGitignore = false,
         silent = false,
+        verbose = false,
         hierarchicalContent = false
     } = options;
 
     // Validate maxFileSize
     if (maxFileSize < MIN_FILE_SIZE || maxFileSize > MAX_FILE_SIZE) {
         throw new Error(`Max file size must be between ${prettyFileSize(MIN_FILE_SIZE)} and ${prettyFileSize(MAX_FILE_SIZE)}`);
+    }
+
+    // Validate verbose and silent cannot be used together
+    if (verbose && silent) {
+        throw new Error('Cannot use verbose and silent options together');
     }
 
     // Check if output files already exist
@@ -367,18 +391,10 @@ function serializeRepo(options) {
     }
 
     // Create initial ignore instance with default patterns
-    const ig = createInitialIgnore(additionalIgnorePatterns, ignoreDefaultPatterns);
-
-    // Add patterns from root .gitignore if processGitignore is true
-    if (!noGitignore) {
-        const rootPatterns = readGitignorePatterns(repoRoot);
-        if (rootPatterns.length > 0) {
-            ig.add(rootPatterns);
-        }
-    }
+    const ig = createInitialIgnore(additionalIgnorePatterns, ignoreDefaultPatterns, verbose);
 
     const structure = generateStructure(repoRoot, ig, repoRoot, '', additionalIgnorePatterns, !noGitignore);
-    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent, hierarchicalContent);
+    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent, verbose, hierarchicalContent);
 
     // Ensure output directory exists
     fs.mkdirSync(outputDir, { recursive: true });

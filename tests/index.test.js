@@ -524,6 +524,17 @@ describe('repo-serializer', () => {
          * - Output file management
          */
 
+        test('throws error when verbose and silent are used together', () => {
+            expect(() => {
+                serializeRepo({
+                    repoRoot: tmpDir.name,
+                    outputDir: outputDir.name,
+                    verbose: true,
+                    silent: true
+                });
+            }).toThrow('Cannot use verbose and silent options together');
+        });
+
         test('succeeds when no files exist', () => {
             const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-serializer-'));
             const repoDir = path.join(tmpDir, 'test-repo');
@@ -1105,7 +1116,31 @@ describe('repo-serializer', () => {
         });
     });
 
-    // File size handling
+    describe('verbose logging', () => {
+        test('logs detailed information when verbose is enabled', async () => {
+            // Create a spy for console.log
+            const consoleSpy = jest.spyOn(console, 'log');
+
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                verbose: true,
+                additionalIgnorePatterns: ['*.tmp', 'temp/']
+            });
+
+            // Verify verbose logging calls
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Added default ignore patterns'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Added additional ignore patterns'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Added gitignore patterns from: .gitignore'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding directory: src/'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding file: src/file2.js'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ignoring: .gitignore'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Adding file: file1.txt'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ignoring: ignored.txt'));
+            expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ignoring: test.log'));
+        });
+    });
+
     describe('file size handling', () => {
         /**
          * Tests file size related functionality:
