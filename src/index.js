@@ -27,6 +27,8 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
  * @property {boolean} [silent] - Whether to suppress console output (default: false)
  * @property {boolean} [verbose] - Whether to enable verbose logging of all processed and ignored files (default: false)
  * @property {boolean} [hierarchicalContent] - Whether to serialize content in hierarchical order (default: false)
+ * @property {number} [maxReplacementRatio] - Maximum allowed ratio of replacement characters (0-1)
+ * @property {boolean} [keepReplacementChars] - Whether to keep replacement characters in output (default: false)
  */
 
 /** @constant {string[]} ALWAYS_IGNORE_PATTERNS - Patterns that are always ignored and cannot be overridden */
@@ -40,6 +42,9 @@ const DEFAULT_IGNORE_PATTERNS = [
     '.*/',
     'package-lock.json',
 ];
+
+/** @constant {number} DEFAULT_REPLACEMENT_RATIO - Default maximum replacement character ratio */
+const DEFAULT_REPLACEMENT_RATIO = 0;
 
 /**
  * Parses a file size in bytes from a string
@@ -96,35 +101,53 @@ function prettyFileSize(size) {
 }
 
 /**
+ * Checks if a string has a high ratio of replacement characters (U+FFFD),
+ * which would indicate it's likely not a text file in this encoding
+ *
+ * @param {string} text - The text to check
+ * @param {number} [maxRatio] - Maximum allowed ratio of replacement characters (between 0 and 1)
+ * @returns {boolean} - True if the text has too many replacement characters
+ * @throws {Error} If maxRatio is not between 0 and 1
+ */
+function hasHighReplacementCharacterRatio(text, maxRatio) {
+    const replacementChar = '\uFFFD';
+
+    // For maxRatio of 0, just check if the replacement character exists
+    if (maxRatio === 0) return text.includes(replacementChar);
+
+    // Otherwise calculate the ratio
+    const replacementCount = (text.match(new RegExp(replacementChar, 'g')) || []).length;
+    return (replacementCount / text.length) > maxRatio;
+}
+
+/**
  * Checks if a file is a text file and within size limit
  *
  * @param {string} filePath - The path to the file
  * @param {number} maxFileSize - Maximum file size in bytes
+ * @param {number} [maxReplacementRatio] - Maximum allowed ratio of replacement characters
  * @returns {boolean} - True if the file is a text file and within size limit
  */
-function isTextFile(filePath, maxFileSize) {
+function isTextFile(filePath, maxFileSize, maxReplacementRatio) {
     try {
         const stats = fs.statSync(filePath);
 
         // Try to read the first chunk of the file to determine if it's text
         const fd = fs.openSync(filePath, 'r');
-        const buffer = Buffer.alloc(Math.min(maxFileSize, stats.size)); // Read up to 8KB or file size
+        const buffer = Buffer.alloc(Math.min(maxFileSize, stats.size)); // Read up to maxFileSize or file size
         const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0);
         fs.closeSync(fd);
 
         // If file is empty, consider it text
         if (bytesRead === 0) return true;
 
-        // Check for non-printable characters
-        for (let i = 0; i < bytesRead; i++) {
-            const byte = buffer[i];
-            // Allow tabs, newlines, carriage returns and printable ASCII characters
-            if (byte !== 0x09 && byte !== 0x0A && byte !== 0x0D && (byte < 0x20 || byte > 0x7E)) {
-                return false;
-            }
-        }
+        // Decode as UTF-8 (handles BOM automatically)
+        const text = buffer.toString('utf8');
 
-        return true;
+        // Replace control characters (except Tab, LF, VT, FF, CR) with replacement character
+        const processedText = replaceControlCharacters(text);
+
+        return !hasHighReplacementCharacterRatio(processedText, maxReplacementRatio);
     } catch (error) {
         console.error(`Error reading file ${filePath}: ${error.message}`);
         return false;
@@ -237,6 +260,24 @@ function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, 
 }
 
 /**
+ * Replaces control characters with replacement characters
+ * @param {string} text - The text to process
+ * @returns {string} - Text with control characters replaced
+ */
+function replaceControlCharacters(text) {
+    return text.replace(/[\u0000-\u0008\u000E-\u001F]/g, '\uFFFD');
+}
+
+/**
+ * Strips replacement characters from text
+ * @param {string} text - The text to process
+ * @returns {string} - Text with replacement characters removed
+ */
+function stripReplacementCharacters(text) {
+    return text.replace(/\uFFFD/g, '');
+}
+
+/**
  * Generates a file containing the contents of all text files in the repository.
  *
  * @param {string} dir - The directory to traverse.
@@ -248,9 +289,11 @@ function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, 
  * @param {boolean} silent - Whether to suppress console output
  * @param {boolean} verbose - Whether to enable verbose logging of all processed and ignored files
  * @param {boolean} hierarchical - Whether to use hierarchical ordering
+ * @param {number} maxReplacementRatio - Maximum allowed ratio of replacement characters
+ * @param {boolean} keepReplacementChars - Whether to keep replacement characters in output
  * @returns {string} - The file contents.
  */
-function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical) {
+function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical, maxReplacementRatio, keepReplacementChars) {
     let contentFile = '';
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -298,15 +341,19 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
             if (verbose) {
                 console.log(`Adding directory: ${relativePath}`);
             }
-            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical);
-        } else if (isTextFile(fullPath, maxFileSize)) {
+            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical, maxReplacementRatio, keepReplacementChars);
+        } else if (isTextFile(fullPath, maxFileSize, maxReplacementRatio)) {
             if (verbose) {
                 console.log(`Adding file: ${relativePath}`);
             }
             contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
             contentFile += `FILE: ${relativePath}\n`;
             contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
-            contentFile += fs.readFileSync(fullPath, 'utf-8');
+            let content = replaceControlCharacters(fs.readFileSync(fullPath, 'utf-8'));
+            if (!keepReplacementChars) {
+                content = stripReplacementCharacters(content);
+            }
+            contentFile += content;
             contentFile += '\n';
             contentFile += '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n';
             contentFile += `END FILE: ${relativePath}\n`;
@@ -350,7 +397,9 @@ function serializeRepo(options) {
         noGitignore = false,
         silent = false,
         verbose = false,
-        hierarchicalContent = false
+        hierarchicalContent = false,
+        maxReplacementRatio = DEFAULT_REPLACEMENT_RATIO,
+        keepReplacementChars = false
     } = options;
 
     // Validate maxFileSize
@@ -361,6 +410,11 @@ function serializeRepo(options) {
     // Validate verbose and silent cannot be used together
     if (verbose && silent) {
         throw new Error('Cannot use verbose and silent options together');
+    }
+
+    // Validate maxReplacementRatio
+    if (maxReplacementRatio < 0 || maxReplacementRatio > 1) {
+        throw new Error('Max replacement ratio must be between 0 and 1');
     }
 
     // Check if output files already exist
@@ -394,7 +448,7 @@ function serializeRepo(options) {
     const ig = createInitialIgnore(additionalIgnorePatterns, ignoreDefaultPatterns, verbose);
 
     const structure = generateStructure(repoRoot, ig, repoRoot, '', additionalIgnorePatterns, !noGitignore);
-    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent, verbose, hierarchicalContent);
+    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent, verbose, hierarchicalContent, maxReplacementRatio, keepReplacementChars);
 
     // Ensure output directory exists
     fs.mkdirSync(outputDir, { recursive: true });
@@ -413,6 +467,7 @@ module.exports = {
     DEFAULT_IGNORE_PATTERNS,
     ALWAYS_IGNORE_PATTERNS,
     DEFAULT_MAX_FILE_SIZE,
+    DEFAULT_REPLACEMENT_RATIO,
     MIN_FILE_SIZE,
     MAX_FILE_SIZE
 };
