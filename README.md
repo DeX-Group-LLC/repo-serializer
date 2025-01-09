@@ -87,11 +87,12 @@ Options:
   # Processing Options
   -m, --max-file-size <size>      Maximum file size to process (512B-4MB). Accepts units: B, KB, MB
                                   Examples: "512B", "1KB", "4MB" (default: 8KB)
-  -r, --max-replacement-ratio <ratio> Maximum ratio of replacement characters allowed (0-1, default: 0)
-  --keep-replacement-chars        Keep replacement characters in output (default: false)
   -a, --all                       Disable default ignore patterns (default: false)
   -g, --no-gitignore              Disable .gitignore processing (enabled by default)
   -i, --ignore <patterns...>      Additional patterns to ignore
+  --hierarchical                  Use hierarchical (alphabetical) ordering for content file (default: false)
+  -r, --max-replacement-ratio <ratio> Maximum ratio of replacement characters allowed (0-1, default: 0)
+  --keep-replacement-chars        Keep replacement characters in output (default: false)
 
   # Behavior Options
   -f, --force                     Overwrite existing files without prompting (default: false)
@@ -104,6 +105,9 @@ Options:
 Examples:
   # Basic input/output usage
   repo-serialize -d ./my-project -o ./output
+
+  # Use hierarchical content ordering
+  repo-serialize --hierarchical
 
   # Disable default ignore patterns
   repo-serialize -a
@@ -154,12 +158,13 @@ const options = {
     contentFile: 'repo_content.txt',
     additionalIgnorePatterns: ['*.log', 'temp/'],
     maxFileSize: 8192,                // 8KB, must be between 512B and 4MB
-    maxReplacementRatio: 0,           // 0 means no replacement characters allowed
-    keepReplacementChars: false,      // false means strip replacement characters
     ignoreDefaultPatterns: false,     // Set to true to disable default ignore patterns
     noGitignore: false,              // Set to true to disable .gitignore processing
     force: false,                    // Set to true to overwrite existing files
     silent: false                    // Set to true to suppress console output
+    hierarchicalContent: false,       // Set to true to use hierarchical (alphabetical) content ordering
+    maxReplacementRatio: 0,           // 0 means no replacement characters allowed
+    keepReplacementChars: false,      // false means strip replacement characters
 };
 
 // Async usage

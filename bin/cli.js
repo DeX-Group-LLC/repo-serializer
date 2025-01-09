@@ -66,6 +66,7 @@ program
     .option('-a, --all', 'Disable default ignore patterns (default: false)')
     .option('-g, --no-gitignore', 'Disable .gitignore processing (enabled by default)')
     .option('-i, --ignore <patterns...>', 'Additional patterns to ignore')
+    .option('--hierarchical', 'Use hierarchical (alphabetical) ordering for content file (default: false)')
     .option('-r, --max-replacement-ratio <ratio>', `Maximum ratio of replacement characters allowed (0-1, default: ${DEFAULT_REPLACEMENT_RATIO})`, DEFAULT_REPLACEMENT_RATIO)
     .option('--keep-replacement-chars', 'Keep replacement characters in output (default: false)')
 
@@ -91,6 +92,7 @@ program
                 ignoreDefaultPatterns: options.all,
                 noGitignore: !options.gitignore,  // Commander sets gitignore=false when --no-gitignore is used
                 silent: options.quiet,
+                hierarchicalContent: options.hierarchical,
                 maxReplacementRatio: parseFloat(options.maxReplacementRatio),
                 keepReplacementChars: options.keepReplacementChars || false
             };

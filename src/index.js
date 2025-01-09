@@ -25,6 +25,7 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
  * @property {boolean} [ignoreDefaultPatterns] - Whether to disable default ignore patterns (default: false)
  * @property {boolean} [noGitignore] - Whether to disable .gitignore processing (default: false)
  * @property {boolean} [silent] - Whether to suppress console output (default: false)
+ * @property {boolean} [hierarchicalContent] - Whether to serialize content in hierarchical order (default: false)
  * @property {number} [maxReplacementRatio] - Maximum allowed ratio of replacement characters (0-1)
  * @property {boolean} [keepReplacementChars] - Whether to keep replacement characters in output (default: false)
  */
@@ -282,13 +283,14 @@ function stripReplacementCharacters(text) {
  * @param {number} maxFileSize - Maximum file size in bytes
  * @param {boolean} processGitignore - Whether to process .gitignore files
  * @param {boolean} silent - Whether to suppress console output
+ * @param {boolean} hierarchical - Whether to use hierarchical ordering
  * @param {number} maxReplacementRatio - Maximum allowed ratio of replacement characters
  * @param {boolean} keepReplacementChars - Whether to keep replacement characters in output
  * @returns {string} - The file contents.
  */
-function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, maxReplacementRatio, keepReplacementChars) {
+function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, hierarchical, maxReplacementRatio, keepReplacementChars) {
     let contentFile = '';
-    const entries = fs.readdirSync(dir);
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
 
     // Create new ignore instance for this directory
     const ig = ignore().add(parentIg);
@@ -301,21 +303,32 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
         }
     }
 
-    for (const entry of entries) {
-        const fullPath = path.join(dir, entry);
-        const stats = fs.statSync(fullPath);
+    // Filter and sort entries
+    const validEntries = entries
+        .filter(entry => {
+            const fullPath = path.join(dir, entry.name);
+            let relativePath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
+            if (entry.isDirectory()) {
+                relativePath += '/';
+            }
+            return !ig.ignores(relativePath);
+        })
+        .sort((a, b) => {
+            if (!hierarchical) {
+                // For non-hierarchical mode, directories before files then alphabetical
+                if (a.isDirectory() && !b.isDirectory()) return -1;
+                if (!a.isDirectory() && b.isDirectory()) return 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+
+    for (const entry of validEntries) {
+        const fullPath = path.join(dir, entry.name);
         let relativePath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
 
-        if (stats.isDirectory()) {
+        if (entry.isDirectory()) {
             relativePath += '/';
-        }
-
-        if (ig.ignores(relativePath)) {
-            continue;
-        }
-
-        if (stats.isDirectory()) {
-            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, maxReplacementRatio, keepReplacementChars);
+            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, hierarchical, maxReplacementRatio, keepReplacementChars);
         } else if (isTextFile(fullPath, maxFileSize, maxReplacementRatio)) {
             contentFile += '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
             contentFile += `FILE: ${relativePath}\n`;
@@ -351,6 +364,7 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
  * @param {boolean} [options.ignoreDefaultPatterns=false] - Ignore default ignore patterns.
  * @param {boolean} [options.processGitignore=true] - Whether to process .gitignore files.
  * @param {boolean} [options.silent=false] - Whether to suppress console output.
+ * @param {boolean} [options.hierarchicalContent=false] - Whether to serialize content in hierarchical order.
  */
 function serializeRepo(options) {
     const {
@@ -365,6 +379,7 @@ function serializeRepo(options) {
         ignoreDefaultPatterns = false,
         noGitignore = false,
         silent = false,
+        hierarchicalContent = false,
         maxReplacementRatio = DEFAULT_REPLACEMENT_RATIO,
         keepReplacementChars = false
     } = options;
@@ -418,7 +433,7 @@ function serializeRepo(options) {
     }
 
     const structure = generateStructure(repoRoot, ig, repoRoot, '', additionalIgnorePatterns, !noGitignore);
-    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent, maxReplacementRatio, keepReplacementChars);
+    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent, hierarchicalContent, maxReplacementRatio, keepReplacementChars);
 
     // Ensure output directory exists
     fs.mkdirSync(outputDir, { recursive: true });

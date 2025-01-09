@@ -125,6 +125,70 @@ describe('repo-serializer', () => {
             expect(content).toContain('Content of file 1');
             expect(content).toContain('console.log("Hello")');
         });
+
+        test('respects hierarchicalContent option for content ordering', () => {
+            /**
+             * Verifies that the hierarchicalContent option correctly affects
+             * the ordering of files in the content file:
+             * - Default (false): directories before files, then alphabetical within each type
+             * - Hierarchical (true): pure alphabetical ordering at each level
+             */
+
+            // Create a specific structure to test ordering
+            fs.mkdirSync(path.join(tmpDir.name, 'b_dir'));
+            fs.writeFileSync(path.join(tmpDir.name, 'b_dir', 'z_file.txt'), 'z_file in b_dir');
+            fs.writeFileSync(path.join(tmpDir.name, 'b_dir', 'a_file.txt'), 'a_file in b_dir');
+            fs.mkdirSync(path.join(tmpDir.name, 'b_dir', 'c_subdir'));
+            fs.writeFileSync(path.join(tmpDir.name, 'b_dir', 'c_subdir', 'file.txt'), 'file in c_subdir');
+            fs.writeFileSync(path.join(tmpDir.name, 'a_file.txt'), 'a_file content');
+            fs.writeFileSync(path.join(tmpDir.name, 'c_file.txt'), 'c_file content');
+
+            // Test default ordering (directories first)
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                structureFile: 'structure1.txt',
+                contentFile: 'content1.txt',
+                hierarchicalContent: false
+            });
+
+            const defaultContent = fs.readFileSync(path.join(outputDir.name, 'content1.txt'), 'utf-8');
+            const defaultMatches = defaultContent.match(/FILE: [^\n]+/g);
+            const defaultFiles = defaultMatches.map(match => match.replace('FILE: ', ''));
+
+            // In default mode:
+            // 1. b_dir/c_subdir/file.txt should come first (deepest directory)
+            // 2. Then b_dir/a_file.txt and b_dir/z_file.txt (alphabetically within b_dir)
+            // 3. Finally a_file.txt and c_file.txt (root files alphabetically)
+            expect(defaultFiles.indexOf('b_dir/c_subdir/file.txt')).toBeLessThan(defaultFiles.indexOf('b_dir/a_file.txt'));
+            expect(defaultFiles.indexOf('b_dir/a_file.txt')).toBeLessThan(defaultFiles.indexOf('b_dir/z_file.txt'));
+            expect(defaultFiles.indexOf('b_dir/z_file.txt')).toBeLessThan(defaultFiles.indexOf('a_file.txt'));
+            expect(defaultFiles.indexOf('a_file.txt')).toBeLessThan(defaultFiles.indexOf('c_file.txt'));
+
+            // Test hierarchical ordering (pure alphabetical)
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                structureFile: 'structure2.txt',
+                contentFile: 'content2.txt',
+                hierarchicalContent: true
+            });
+
+            const hierarchicalContent = fs.readFileSync(path.join(outputDir.name, 'content2.txt'), 'utf-8');
+            const hierarchicalMatches = hierarchicalContent.match(/FILE: [^\n]+/g);
+            const hierarchicalFiles = hierarchicalMatches.map(match => match.replace('FILE: ', ''));
+
+            // In hierarchical mode:
+            // 1. a_file.txt comes first (root level, alphabetically)
+            // 2. Then b_dir/a_file.txt (b_dir content, alphabetically)
+            // 3. Then b_dir/c_subdir/file.txt (subdir content)
+            // 4. Then b_dir/z_file.txt (continuing b_dir content)
+            // 5. Finally c_file.txt (root level)
+            expect(hierarchicalFiles.indexOf('a_file.txt')).toBeLessThan(hierarchicalFiles.indexOf('b_dir/a_file.txt'));
+            expect(hierarchicalFiles.indexOf('b_dir/a_file.txt')).toBeLessThan(hierarchicalFiles.indexOf('b_dir/c_subdir/file.txt'));
+            expect(hierarchicalFiles.indexOf('b_dir/c_subdir/file.txt')).toBeLessThan(hierarchicalFiles.indexOf('b_dir/z_file.txt'));
+            expect(hierarchicalFiles.indexOf('b_dir/z_file.txt')).toBeLessThan(hierarchicalFiles.indexOf('c_file.txt'));
+        });
     });
 
     // File ignoring tests
@@ -268,6 +332,145 @@ describe('repo-serializer', () => {
             expect(DEFAULT_IGNORE_PATTERNS).toContain('.*');
             expect(DEFAULT_IGNORE_PATTERNS).toContain('.*/');
             expect(DEFAULT_IGNORE_PATTERNS).toContain('package-lock.json');
+        });
+
+        test('handles ignored files in subdirectories', () => {
+            /**
+             * Verifies that ignored files in subdirectories are properly excluded
+             * and that the ignore patterns are correctly propagated through
+             * recursive directory traversal
+             */
+
+            // Create nested directories with mix of ignored and non-ignored files
+            fs.mkdirSync(path.join(tmpDir.name, 'nested'));
+            fs.mkdirSync(path.join(tmpDir.name, 'nested', 'subdir'));
+            fs.mkdirSync(path.join(tmpDir.name, 'ignored_dir'));
+
+            // Create files that should be ignored at different levels
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'test.log'), 'Should be ignored');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'subdir', 'test.log'), 'Should be ignored');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'ignored.txt'), 'Should be ignored');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'subdir', 'ignored.txt'), 'Should be ignored');
+
+            // Create files in ignored directory
+            fs.writeFileSync(path.join(tmpDir.name, 'ignored_dir', 'file1.txt'), 'Should be ignored - in ignored dir');
+            fs.writeFileSync(path.join(tmpDir.name, 'ignored_dir', 'file2.txt'), 'Should be ignored - in ignored dir');
+
+            // Create files that should not be ignored
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'keep.txt'), 'Should be kept');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'subdir', 'keep.txt'), 'Should be kept');
+
+            // Add ignored_dir to gitignore
+            fs.appendFileSync(path.join(tmpDir.name, '.gitignore'), '\nignored_dir/');
+
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt'
+            });
+
+            const structure = fs.readFileSync(path.join(outputDir.name, 'structure.txt'), 'utf-8');
+            const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
+
+            // Verify ignored files are not in structure
+            expect(structure).not.toContain('test.log');
+            expect(structure).not.toContain('ignored.txt');
+            expect(structure).not.toContain('ignored_dir');
+
+            // Verify non-ignored files are in structure
+            expect(structure).toContain('keep.txt');
+
+            // Verify ignored files are not in content
+            expect(content).not.toContain('Should be ignored');
+            expect(content).not.toContain('Should be ignored - in ignored dir');
+
+            // Verify non-ignored files are in content
+            expect(content).toContain('Should be kept');
+
+            // Verify both levels of nesting for non-ignored directories
+            expect(content).toContain('FILE: nested/keep.txt');
+            expect(content).toContain('FILE: nested/subdir/keep.txt');
+
+            // Test with noGitignore to ensure the directory is included when ignores are disabled
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                structureFile: 'structure_no_ignore.txt',
+                contentFile: 'content_no_ignore.txt',
+                noGitignore: true
+            });
+
+            const structureNoIgnore = fs.readFileSync(path.join(outputDir.name, 'structure_no_ignore.txt'), 'utf-8');
+            const contentNoIgnore = fs.readFileSync(path.join(outputDir.name, 'content_no_ignore.txt'), 'utf-8');
+
+            // Verify previously ignored directory is now included
+            expect(structureNoIgnore).toContain('ignored_dir');
+            expect(contentNoIgnore).toContain('Should be ignored - in ignored dir');
+        });
+
+        test('skips recursive content generation for ignored directories', () => {
+            /**
+             * Verifies that generateContentFile is not called for ignored directories
+             * by creating a complex directory structure with ignored and non-ignored paths
+             */
+
+            // Create a complex directory structure
+            fs.mkdirSync(path.join(tmpDir.name, 'parent'));
+            fs.mkdirSync(path.join(tmpDir.name, 'parent', 'ignored_dir'));
+            fs.mkdirSync(path.join(tmpDir.name, 'parent', 'kept_dir'));
+
+            // Create files in ignored directory
+            fs.writeFileSync(path.join(tmpDir.name, 'parent', 'ignored_dir', 'test1.txt'), 'ignored content 1');
+            fs.writeFileSync(path.join(tmpDir.name, 'parent', 'ignored_dir', 'test2.txt'), 'ignored content 2');
+            fs.mkdirSync(path.join(tmpDir.name, 'parent', 'ignored_dir', 'subdir'));
+            fs.writeFileSync(path.join(tmpDir.name, 'parent', 'ignored_dir', 'subdir', 'test3.txt'), 'ignored content 3');
+
+            // Create files in kept directory
+            fs.writeFileSync(path.join(tmpDir.name, 'parent', 'kept_dir', 'keep1.txt'), 'kept content 1');
+            fs.writeFileSync(path.join(tmpDir.name, 'parent', 'kept_dir', 'keep2.txt'), 'kept content 2');
+            fs.mkdirSync(path.join(tmpDir.name, 'parent', 'kept_dir', 'subdir'));
+            fs.writeFileSync(path.join(tmpDir.name, 'parent', 'kept_dir', 'subdir', 'keep3.txt'), 'kept content 3');
+
+            // Create a .gitignore in the parent directory
+            fs.writeFileSync(path.join(tmpDir.name, 'parent', '.gitignore'), 'ignored_dir/\n');
+
+            // First test: with gitignore enabled
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                structureFile: 'structure1.txt',
+                contentFile: 'content1.txt'
+            });
+
+            const structure1 = fs.readFileSync(path.join(outputDir.name, 'structure1.txt'), 'utf-8');
+            const content1 = fs.readFileSync(path.join(outputDir.name, 'content1.txt'), 'utf-8');
+
+            // Verify ignored directory and its contents are not included
+            expect(structure1).not.toContain('ignored_dir');
+            expect(content1).not.toContain('ignored content');
+            // But kept directory and its contents are included
+            expect(structure1).toContain('kept_dir');
+            expect(content1).toContain('kept content');
+
+            // Second test: with gitignore disabled
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                structureFile: 'structure2.txt',
+                contentFile: 'content2.txt',
+                noGitignore: true
+            });
+
+            const structure2 = fs.readFileSync(path.join(outputDir.name, 'structure2.txt'), 'utf-8');
+            const content2 = fs.readFileSync(path.join(outputDir.name, 'content2.txt'), 'utf-8');
+
+            // Verify previously ignored directory and its contents are now included
+            expect(structure2).toContain('ignored_dir');
+            expect(content2).toContain('ignored content');
+            // And kept directory and its contents are still included
+            expect(structure2).toContain('kept_dir');
+            expect(content2).toContain('kept content');
         });
     });
 
