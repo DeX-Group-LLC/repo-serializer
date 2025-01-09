@@ -184,15 +184,20 @@ function isTextFile(filePath, maxFileSize, maxReplacementRatio) {
  * Reads gitignore patterns from a directory
  *
  * @param {string} dir - Directory to read patterns from
+ * @param {string} repoRoot - Root directory of the repository
  * @returns {string[]} - Array of patterns from the gitignore file
  */
-function readGitignorePatterns(dir) {
+function readGitignorePatterns(dir, repoRoot) {
     const gitignorePath = path.join(dir, '.gitignore');
     if (fs.existsSync(gitignorePath)) {
+        const relativeDir = path.relative(repoRoot, dir).replace(/\\/g, '/');
         const content = fs.readFileSync(gitignorePath, 'utf-8');
         return content.split('\n')
-            .map(line => line.trim())
-            .filter(line => line && !line.startsWith('#'));
+            .filter(line => line.trim() && !line.trim().startsWith('#'))
+            .map(line => {
+                // If the pattern is only for this directory, prefix it with the relative path
+                return line.startsWith('/') ? relativeDir + line : line;
+            });
     }
     return [];
 }
@@ -242,7 +247,7 @@ function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, 
 
     // Add patterns from this directory's .gitignore if it exists and processGitignore is true
     if (processGitignore) {
-        const dirPatterns = readGitignorePatterns(dir);
+        const dirPatterns = readGitignorePatterns(dir, repoRoot);
         if (dirPatterns.length > 0) {
             ig.add(dirPatterns);
         }
@@ -328,7 +333,7 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
 
     // Add patterns from this directory's .gitignore if it exists and processGitignore is true
     if (processGitignore) {
-        const dirPatterns = readGitignorePatterns(dir);
+        const dirPatterns = readGitignorePatterns(dir, repoRoot);
         if (dirPatterns.length > 0) {
             ig.add(dirPatterns);
             if (verbose) {

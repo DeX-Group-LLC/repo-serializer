@@ -472,6 +472,54 @@ describe('repo-serializer', () => {
             expect(structure2).toContain('kept_dir');
             expect(content2).toContain('kept content');
         });
+
+        test('handles leading slash in gitignore patterns', () => {
+            /**
+             * Tests that patterns starting with '/' in .gitignore are treated as relative
+             * to the directory containing the .gitignore file, not the entire repository
+             */
+
+            // Create nested directories with different .gitignore files
+            fs.mkdirSync(path.join(tmpDir.name, 'nested'));
+            fs.mkdirSync(path.join(tmpDir.name, 'nested', 'subdir'));
+
+            // Create .gitignore in root with leading slash
+            fs.writeFileSync(path.join(tmpDir.name, '.gitignore'), '/test.txt\n/nested/allowed.txt');
+
+            // Create .gitignore in nested directory with leading slash
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', '.gitignore'), '/test.txt');
+
+            // Create test files
+            fs.writeFileSync(path.join(tmpDir.name, 'test.txt'), 'Should be ignored by root gitignore');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'test.txt'), 'Should be ignored by nested gitignore');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'allowed.txt'), 'Should be ignored by root gitignore');
+            fs.writeFileSync(path.join(tmpDir.name, 'nested', 'subdir', 'test.txt'), 'Should NOT be ignored');
+
+            serializeRepo({
+                repoRoot: tmpDir.name,
+                outputDir: outputDir.name,
+                structureFile: 'structure.txt',
+                contentFile: 'content.txt'
+            });
+
+            const content = fs.readFileSync(path.join(outputDir.name, 'content.txt'), 'utf-8');
+
+            // Root /test.txt should be ignored
+            expect(content).not.toContain('FILE: test.txt');
+            expect(content).not.toContain('Should be ignored by root gitignore');
+
+            // /nested/allowed.txt should be ignored by root gitignore
+            expect(content).not.toContain('FILE: nested/allowed.txt');
+            expect(content).not.toContain('Should be ignored by root gitignore');
+
+            // nested/test.txt should be ignored by nested gitignore
+            expect(content).not.toContain('FILE: nested/test.txt');
+            expect(content).not.toContain('Should be ignored by nested gitignore');
+
+            // nested/subdir/test.txt should NOT be ignored
+            expect(content).toContain('FILE: nested/subdir/test.txt');
+            expect(content).toContain('Should NOT be ignored');
+        });
     });
 
     // Directory handling tests
