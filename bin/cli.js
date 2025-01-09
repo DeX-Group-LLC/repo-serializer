@@ -57,24 +57,24 @@ program
     ].join('\n'))
 
     // Input/Output Options
-    .option('-d, --dir <directory>', 'Target directory to serialize (default: current working directory)', process.cwd())
-    .option('-o, --output <directory>', 'Output directory for generated files (default: current working directory)', process.cwd())
-    .option('-s, --structure-file <filename>', 'Name of the structure output file (default: repo_structure.txt)', 'repo_structure.txt')
-    .option('-c, --content-file <filename>', 'Name of the content output file (default: repo_content.txt)', 'repo_content.txt')
+    .option('-d, --dir <directory>', 'Target directory to serialize', process.cwd())
+    .option('-o, --output <directory>', 'Output directory for generated files', process.cwd())
+    .option('-s, --structure-file <filename>', 'Name of the structure output file', 'repo_structure.txt')
+    .option('-c, --content-file <filename>', 'Name of the content output file', 'repo_content.txt')
 
     // Processing Options
-    .option('-m, --max-file-size <size>', `Maximum file size to process (${prettyFileSize(MIN_FILE_SIZE)}-${prettyFileSize(MAX_FILE_SIZE)}). Accepts units: B, KB, MB (default: ${prettyFileSize(DEFAULT_MAX_FILE_SIZE)})`, prettyFileSize(DEFAULT_MAX_FILE_SIZE))
-    .option('-a, --all', 'Disable default ignore patterns (default: false)')
-    .option('-g, --no-gitignore', 'Disable .gitignore processing (enabled by default)')
+    .option('-m, --max-file-size <size>', `Maximum file size to process (${prettyFileSize(MIN_FILE_SIZE)}-${prettyFileSize(MAX_FILE_SIZE)}). Accepts units: B, KB, MB`, prettyFileSize(DEFAULT_MAX_FILE_SIZE))
+    .option('-a, --all', 'Disable default ignore patterns')
+    .option('-g, --no-gitignore', 'Disable .gitignore processing')
     .option('-i, --ignore <patterns...>', 'Additional patterns to ignore')
-    .option('--hierarchical', 'Use hierarchical (alphabetical) ordering for content file (default: false)')
-    .option('-r, --max-replacement-ratio <ratio>', `Maximum ratio of replacement characters allowed (0-1, default: ${DEFAULT_REPLACEMENT_RATIO})`, DEFAULT_REPLACEMENT_RATIO)
-    .option('--keep-replacement-chars', 'Keep replacement characters in output (default: false)')
+    .option('--hierarchical', 'Use hierarchical (alphabetical) ordering for content file', false)
+    .option('-r, --max-replacement-ratio <ratio>', `Maximum ratio of replacement characters allowed (0-1)`, DEFAULT_REPLACEMENT_RATIO)
+    .option('--keep-replacement-chars', 'Keep replacement characters in output', false)
 
     // Behavior Options
-    .option('-f, --force', 'Overwrite existing files without prompting (default: false)')
-    .addOption(new Option('--silent', 'Suppress all console output (default: false)').conflicts('verbose'))
-    .addOption(new Option('--verbose', 'Enable verbose logging of all processed and ignored files (default: false)').conflicts('silent'))
+    .option('-f, --force', 'Overwrite existing files without prompting', false)
+    .addOption(new Option('--silent', 'Suppress all console output', false).conflicts('verbose'))
+    .addOption(new Option('--verbose', 'Enable verbose logging of all processed and ignored files', false).conflicts('silent'))
 
     // Information Options
     .version(version, '-v, --version', 'Display the version number')
