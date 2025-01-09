@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { program } = require('commander');
+const { program, Option } = require('commander');
 const path = require('path');
 const fs = require('fs');
 const readline = require('readline');
@@ -40,6 +40,7 @@ async function handleExistingFiles(outputDir, structureFile, contentFile) {
             console.log('Operation cancelled.');
             process.exit(0);
         }
+        console.log('');
     }
 }
 
@@ -69,7 +70,8 @@ program
 
     // Behavior Options
     .option('-f, --force', 'Overwrite existing files without prompting (default: false)')
-    .option('-q, --quiet', 'Reduce output to console (default: false)')
+    .addOption(new Option('--silent', 'Suppress all console output (default: false)').conflicts('verbose'))
+    .addOption(new Option('--verbose', 'Enable verbose logging of all processed and ignored files (default: false)').conflicts('silent'))
 
     // Information Options
     .version(version, '-v, --version', 'Display the version number')
@@ -88,7 +90,8 @@ program
                 maxFileSize: parseFileSize(options.maxFileSize),
                 ignoreDefaultPatterns: options.all,
                 noGitignore: !options.gitignore,  // Commander sets gitignore=false when --no-gitignore is used
-                silent: options.quiet
+                silent: options.silent,
+                verbose: options.verbose
             };
 
             try {
