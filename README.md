@@ -88,6 +88,7 @@ Options:
   -a, --all                       Disable default ignore patterns (default: false)
   -g, --no-gitignore              Disable .gitignore processing (enabled by default)
   -i, --ignore <patterns...>      Additional patterns to ignore
+  --hierarchical                  Use hierarchical (alphabetical) ordering for content file (default: false)
 
   # Behavior Options
   -f, --force                     Overwrite existing files without prompting (default: false)
@@ -102,6 +103,9 @@ Options:
 Examples:
   # Basic input/output usage
   repo-serialize -d ./my-project -o ./output
+
+  # Use hierarchical content ordering
+  repo-serialize --hierarchical
 
   # Disable default ignore patterns
   repo-serialize -a
@@ -142,6 +146,7 @@ await serializeRepo({
     outputDir: '/path/to/output'
 });
 
+
 // Advanced usage with all options
 await serializeRepo({
     // Input/Output options
@@ -155,6 +160,7 @@ await serializeRepo({
     ignoreDefaultPatterns: false,        // Set to true to disable default ignores
     noGitignore: false,                  // Set to true to disable .gitignore processing
     additionalIgnorePatterns: ['*.log'], // Additional patterns to ignore
+    hierarchicalContent: false,          // Set to true to use hierarchical (alphabetical) content ordering
 
     // Behavior options
     force: false,                        // Overwrite without prompting
@@ -162,8 +168,6 @@ await serializeRepo({
     verbose: false                       // Enable verbose logging (cannot be used with silent)
 });
 ```
-
-The function returns a Promise that resolves when the serialization is complete.
 
 ## Output Format
 

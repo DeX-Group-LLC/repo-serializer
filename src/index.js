@@ -26,6 +26,7 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
  * @property {boolean} [noGitignore] - Whether to disable .gitignore processing (default: false)
  * @property {boolean} [silent] - Whether to suppress console output (default: false)
  * @property {boolean} [verbose] - Whether to enable verbose logging of all processed and ignored files (default: false)
+ * @property {boolean} [hierarchicalContent] - Whether to serialize content in hierarchical order (default: false)
  */
 
 /** @constant {string[]} ALWAYS_IGNORE_PATTERNS - Patterns that are always ignored and cannot be overridden */
@@ -246,11 +247,12 @@ function generateStructure(dir, parentIg, repoRoot, prefix, additionalPatterns, 
  * @param {boolean} processGitignore - Whether to process .gitignore files
  * @param {boolean} silent - Whether to suppress console output
  * @param {boolean} verbose - Whether to enable verbose logging of all processed and ignored files
+ * @param {boolean} hierarchical - Whether to use hierarchical ordering
  * @returns {string} - The file contents.
  */
-function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose) {
+function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical) {
     let contentFile = '';
-    const entries = fs.readdirSync(dir);
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
 
     // Create new ignore instance for this directory
     const ig = ignore().add(parentIg);
@@ -261,17 +263,27 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
         if (dirPatterns.length > 0) {
             ig.add(dirPatterns);
             if (verbose) {
-                console.log(`Added gitignore patterns from ${path.relative(repoRoot, dir)}/.gitignore`);
+                console.log(`Added gitignore patterns from: ${path.relative(repoRoot, dir) != '' ? path.relative(repoRoot, dir) + '/' : ''}.gitignore`);
             }
         }
     }
 
-    for (const entry of entries) {
-        const fullPath = path.join(dir, entry);
-        const stats = fs.statSync(fullPath);
+    // Filter and sort entries
+    const validEntries = entries
+        .sort((a, b) => {
+            if (!hierarchical) {
+                // For non-hierarchical mode, directories before files then alphabetical
+                if (a.isDirectory() && !b.isDirectory()) return -1;
+                if (!a.isDirectory() && b.isDirectory()) return 1;
+            }
+            return a.name.localeCompare(b.name);
+        });
+
+    for (const entry of validEntries) {
+        const fullPath = path.join(dir, entry.name);
         let relativePath = path.relative(repoRoot, fullPath).replace(/\\/g, '/');
 
-        if (stats.isDirectory()) {
+        if (entry.isDirectory()) {
             relativePath += '/';
         }
 
@@ -282,11 +294,11 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
             continue;
         }
 
-        if (stats.isDirectory()) {
+        if (entry.isDirectory()) {
             if (verbose) {
                 console.log(`Adding directory: ${relativePath}`);
             }
-            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose);
+            contentFile += generateContentFile(fullPath, ig, repoRoot, additionalPatterns, maxFileSize, processGitignore, silent, verbose, hierarchical);
         } else if (isTextFile(fullPath, maxFileSize)) {
             if (verbose) {
                 console.log(`Adding file: ${relativePath}`);
@@ -322,6 +334,7 @@ function generateContentFile(dir, parentIg, repoRoot, additionalPatterns, maxFil
  * @param {boolean} [options.processGitignore=true] - Whether to process .gitignore files.
  * @param {boolean} [options.silent=false] - Whether to suppress console output.
  * @param {boolean} [options.verbose=false] - Whether to enable verbose logging of all processed and ignored files.
+ * @param {boolean} [options.hierarchicalContent=false] - Whether to serialize content in hierarchical order.
  */
 function serializeRepo(options) {
     const {
@@ -336,7 +349,8 @@ function serializeRepo(options) {
         ignoreDefaultPatterns = false,
         noGitignore = false,
         silent = false,
-        verbose = false
+        verbose = false,
+        hierarchicalContent = false
     } = options;
 
     // Validate maxFileSize
@@ -380,7 +394,7 @@ function serializeRepo(options) {
     const ig = createInitialIgnore(additionalIgnorePatterns, ignoreDefaultPatterns, verbose);
 
     const structure = generateStructure(repoRoot, ig, repoRoot, '', additionalIgnorePatterns, !noGitignore);
-    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent, verbose);
+    const content = generateContentFile(repoRoot, ig, repoRoot, additionalIgnorePatterns, maxFileSize, !noGitignore, silent, verbose, hierarchicalContent);
 
     // Ensure output directory exists
     fs.mkdirSync(outputDir, { recursive: true });
